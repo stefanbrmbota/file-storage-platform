@@ -38,6 +38,10 @@ services/<servis>/      svaki servis je zaseban Go modul
 - U `main` samo preko PR-a uz review drugog člana.
 
 ## Komande
+MongoDB za lokalni razvoj (jednom; posle `docker start files-mongo`):
+```
+docker run -d --name files-mongo -p 27017:27017 mongo:8.0
+```
 Iz foldera servisa (npr. `cd services/files`), svaka komanda posebno (Windows PowerShell 5.1 ne podržava `&&`):
 ```
 go build ./...

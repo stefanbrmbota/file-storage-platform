@@ -8,7 +8,7 @@ type Folder struct {
 	ID        string    `json:"id" bson:"_id"`
 	Name      string    `json:"name" bson:"name"`
 	OwnerID   string    `json:"ownerId" bson:"ownerId"`
-	ParentID  string    `json:"parentId,omitempty" bson:"parentId,omitempty"`
+	ParentID  string    `json:"parentId,omitempty" bson:"parentId"`
 	CreatedAt time.Time `json:"createdAt" bson:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt" bson:"updatedAt"`
 }
