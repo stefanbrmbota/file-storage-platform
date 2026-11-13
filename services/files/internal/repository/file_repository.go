@@ -35,7 +35,7 @@ func NewFileRepository(ctx context.Context, db *mongo.Database) (*FileRepository
 
 // ListByParent returns all files in one folder, sorted by name.
 func (r *FileRepository) ListByParent(ctx context.Context, ownerID, parentID string) ([]model.File, error) {
-	//      ↑ FileRepository                                                              ↑ model.File
+	
 	filter := bson.M{"ownerId": ownerID, "parentId": parentID}
 	opts := options.Find().SetSort(bson.D{{Key: "name", Value: 1}})
 
@@ -44,9 +44,9 @@ func (r *FileRepository) ListByParent(ctx context.Context, ownerID, parentID str
 		return nil, err
 	}
 
-	files := []model.File{}                         // ← files, model.File
-	if err := cursor.All(ctx, &files); err != nil { // ← &files
+	files := []model.File{}                        
+	if err := cursor.All(ctx, &files); err != nil { 
 		return nil, err
 	}
-	return files, nil // ← files
+	return files, nil 
 }
