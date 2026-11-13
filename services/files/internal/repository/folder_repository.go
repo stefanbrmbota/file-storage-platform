@@ -68,3 +68,20 @@ func (r *FolderRepository) findOne(ctx context.Context, filter bson.M) (*model.F
 	}
 	return &f, nil
 }
+
+// ListByParent returns all subfolders of one folder, sorted by name.
+func (r *FolderRepository) ListByParent(ctx context.Context, ownerID, parentID string) ([]model.Folder, error) {
+	filter := bson.M{"ownerId": ownerID, "parentId": parentID}
+	opts := options.Find().SetSort(bson.D{{Key: "name", Value: 1}})
+
+	cursor, err := r.coll.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	folders := []model.Folder{}
+	if err := cursor.All(ctx, &folders); err != nil {
+		return nil, err
+	}
+	return folders, nil
+}
