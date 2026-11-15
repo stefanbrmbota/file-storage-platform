@@ -136,3 +136,35 @@ func TestParamsFromEnv_Invalid(t *testing.T) {
 		})
 	}
 }
+
+func TestVerify_BothHashesOfSamePasswordValid(t *testing.T) {
+	a, _ := Hash("macka123", testParams)
+	b, _ := Hash("macka123", testParams)
+	for _, h := range []string{a, b} {
+		if ok, err := Verify("macka123", h); err != nil || !ok {
+			t.Fatalf("ocekivano (true, nil), dobijeno (%v, %v)", ok, err)
+		}
+	}
+}
+
+func TestVerify_SimilarPasswordsRejected(t *testing.T) {
+	h, _ := Hash("Macka123", testParams)
+	for _, wrong := range []string{"macka123", "Macka124", "Macka123 ", "Macka12", ""} {
+		ok, err := Verify(wrong, h)
+		if err != nil || ok {
+			t.Fatalf("lozinka %q: ocekivano (false, nil), dobijeno (%v, %v)", wrong, ok, err)
+		}
+	}
+}
+
+func TestHashVerify_UnicodeAndEmpty(t *testing.T) {
+	for _, pw := range []string{"šđčćž-ŠĐČĆŽ", "лозинка", "", strings.Repeat("a", 1000)} {
+		h, err := Hash(pw, testParams)
+		if err != nil {
+			t.Fatalf("Hash(%q): %v", pw, err)
+		}
+		if ok, err := Verify(pw, h); err != nil || !ok {
+			t.Fatalf("Verify(%q): dobijeno (%v, %v)", pw, ok, err)
+		}
+	}
+}
