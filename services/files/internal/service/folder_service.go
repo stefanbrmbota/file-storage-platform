@@ -32,15 +32,23 @@ type FolderStore interface {
 	Create(ctx context.Context, f *model.Folder) error
 	FindByID(ctx context.Context, id string) (*model.Folder, error)
 	FindRoot(ctx context.Context, ownerID string) (*model.Folder, error)
+	ListByParent(ctx context.Context, ownerID, parentID string) ([]model.Folder, error)
+}
+
+// FileStore is what the service needs for file metadata. The real
+// implementation is repository.FileRepository.
+type FileStore interface {
+	ListByParent(ctx context.Context, ownerID, parentID string) ([]model.File, error)
 }
 
 type FolderService struct {
 	store FolderStore
+	files FileStore
 	now   func() time.Time
 }
 
-func NewFolderService(store FolderStore) *FolderService {
-	return &FolderService{store: store, now: time.Now}
+func NewFolderService(store FolderStore, files FileStore) *FolderService {
+	return &FolderService{store: store, files: files, now: time.Now}
 }
 
 // CreateRoot gives a newly registered user a root folder. Calling it again
