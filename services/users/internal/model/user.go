@@ -38,3 +38,11 @@ func NewUser(id, username, email, passwordHash string, now time.Time) User {
 		CreatedAt:    now,
 	}
 }
+
+// NewAdmin pravi admin nalog. Koristi se iskljucivo pri pokretanju servisa
+// (US-24), nikad iz zahteva za registraciju.
+func NewAdmin(id, username, email, passwordHash string, now time.Time) User {
+	u := NewUser(id, username, email, passwordHash, now)
+	u.Role = RoleAdmin
+	return u
+}

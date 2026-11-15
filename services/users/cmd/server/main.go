@@ -1,0 +1,107 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
+
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/password"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
+)
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Error("neispravna konfiguracija", "err", err)
+		os.Exit(1)
+	}
+	params, err := password.ParamsFromEnv()
+	if err != nil {
+		logger.Error("neispravni argon2 parametri", "err", err)
+		os.Exit(1)
+	}
+
+	client, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI))
+	if err != nil {
+		logger.Error("mongo connect failed", "err", err)
+		os.Exit(1)
+	}
+	startCtx, cancelStart := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancelStart()
+	if err := client.Ping(startCtx, nil); err != nil {
+		logger.Error("mongo nije dostupan", "err", err)
+		os.Exit(1)
+	}
+
+	userRepo, err := repository.NewUserRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("user repository init failed", "err", err)
+		os.Exit(1)
+	}
+
+	// US-24: inicijalni admin nalog iz env promenljivih (ako vec ne postoji).
+	if cfg.AdminConfigured() {
+		created, err := service.EnsureAdmin(startCtx, userRepo, cfg.AdminEmail, cfg.AdminPassword, params)
+		if err != nil {
+			logger.Error("kreiranje admin naloga nije uspelo", "err", err)
+			os.Exit(1)
+		}
+		if created {
+			logger.Info("admin nalog kreiran", "email", cfg.AdminEmail)
+		} else {
+			logger.Info("admin nalog vec postoji", "email", cfg.AdminEmail)
+		}
+	} else {
+		logger.Warn("ADMIN_EMAIL i ADMIN_PASSWORD nisu postavljeni, admin nalog se ne kreira")
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"status":"ok"}`))
+	})
+
+	srv := &http.Server{
+		Addr:              ":" + cfg.Port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
+	go func() {
+		logger.Info("users service started", "port", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server failed", "err", err)
+			os.Exit(1)
+		}
+	}()
+
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+	<-stop
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		logger.Error("shutdown failed", "err", err)
+	}
+	if err := client.Disconnect(ctx); err != nil {
+		logger.Error("mongo disconnect failed", "err", err)
+	}
+	logger.Info("users service stopped")
+}
