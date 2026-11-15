@@ -21,6 +21,7 @@ func (h *Handler) Routes() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", h.health)
 	mux.HandleFunc("POST /folders", h.createFolder)
+	mux.HandleFunc("GET /folders/{id}/contents", h.folderContents)
 	mux.HandleFunc("POST /internal/folders/root", h.createRootFolder)
 	return mux
 }

@@ -37,6 +37,22 @@ func (h *Handler) createFolder(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusCreated, folder)
 }
 
+// GET /folders/{id}/contents
+// Use "root" as the id for the user's root folder: GET /folders/root/contents.
+func (h *Handler) folderContents(w http.ResponseWriter, r *http.Request) {
+	owner, ok := userID(w, r)
+	if !ok {
+		return
+	}
+
+	contents, err := h.folders.Contents(r.Context(), owner, r.PathValue("id"))
+	if err != nil {
+		writeFolderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, contents)
+}
+
 // POST /internal/folders/root  {"userId": "..."}
 // Called by the Users service after registration (US-04).
 func (h *Handler) createRootFolder(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +82,7 @@ func writeFolderError(w http.ResponseWriter, err error) {
 	switch {
 	case errors.Is(err, service.ErrInvalidName):
 		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, service.ErrParentNotFound):
+	case errors.Is(err, service.ErrParentNotFound), errors.Is(err, service.ErrFolderNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, service.ErrNameTaken):
 		writeError(w, http.StatusConflict, err.Error())
