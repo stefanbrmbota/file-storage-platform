@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 
@@ -46,10 +47,37 @@ func (s *fakeStore) FindRoot(_ context.Context, ownerID string) (*model.Folder, 
 	return nil, repository.ErrNotFound
 }
 
+func (s *fakeStore) ListByParent(_ context.Context, ownerID, parentID string) ([]model.Folder, error) {
+	out := []model.Folder{}
+	for _, f := range s.folders {
+		if f.OwnerID == ownerID && f.ParentID == parentID {
+			out = append(out, *f)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
+// fakeFileStore keeps file metadata in memory.
+type fakeFileStore struct {
+	files []model.File
+}
+
+func (s *fakeFileStore) ListByParent(_ context.Context, ownerID, parentID string) ([]model.File, error) {
+	out := []model.File{}
+	for _, f := range s.files {
+		if f.OwnerID == ownerID && f.ParentID == parentID {
+			out = append(out, f)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out, nil
+}
+
 // setup returns a service and the root folder of user "ana".
 func setup(t *testing.T) (*FolderService, *model.Folder) {
 	t.Helper()
-	svc := NewFolderService(newFakeStore())
+	svc := NewFolderService(newFakeStore(), &fakeFileStore{})
 	root, _, err := svc.CreateRoot(context.Background(), "ana")
 	if err != nil {
 		t.Fatalf("CreateRoot: %v", err)

@@ -43,7 +43,12 @@ func main() {
 		logger.Error("folder repository init failed", "err", err)
 		os.Exit(1)
 	}
-	folders := service.NewFolderService(folderRepo)
+	fileRepo, err := repository.NewFileRepository(startCtx, db)
+	if err != nil {
+		logger.Error("file repository init failed", "err", err)
+		os.Exit(1)
+	}
+	folders := service.NewFolderService(folderRepo, fileRepo)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
