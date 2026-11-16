@@ -13,7 +13,10 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 )
 
-const adminUsername = "admin"
+const (
+	adminFirstName = "Admin"
+	adminLastName  = "Admin"
+)
 
 // EnsureAdmin pravi admin nalog ako ne postoji nalog sa datim emailom (US-24).
 // Lozinka se hesira paketom password. Vraca true ako je nalog kreiran, false
@@ -40,7 +43,7 @@ func EnsureAdmin(ctx context.Context, repo repository.UserRepository, email, pla
 		return false, err
 	}
 
-	err = repo.Create(ctx, model.NewAdmin(id, adminUsername, email, hash, time.Now().UTC()))
+	err = repo.Create(ctx, model.NewAdmin(id, adminFirstName, adminLastName, email, hash, time.Now().UTC()))
 	if errors.Is(err, repository.ErrEmailTaken) {
 		// Druga instanca servisa je upravo napravila nalog.
 		return false, nil

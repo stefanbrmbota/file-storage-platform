@@ -23,6 +23,15 @@ func (f *fakeRepo) FindByEmail(_ context.Context, email string) (model.User, err
 	return model.User{}, repository.ErrNotFound
 }
 
+func (f *fakeRepo) FindByID(_ context.Context, id string) (model.User, error) {
+	for _, u := range f.users {
+		if u.ID == id {
+			return u, nil
+		}
+	}
+	return model.User{}, repository.ErrNotFound
+}
+
 func (f *fakeRepo) Create(_ context.Context, u model.User) error {
 	if _, ok := f.users[u.Email]; ok || f.raceOnNew {
 		return repository.ErrEmailTaken
