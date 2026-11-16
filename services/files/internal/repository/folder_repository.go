@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
@@ -67,6 +68,30 @@ func (r *FolderRepository) findOne(ctx context.Context, filter bson.M) (*model.F
 		return nil, err
 	}
 	return &f, nil
+}
+
+// Rename changes a folder's name and its last-modified time.
+func (r *FolderRepository) Rename(ctx context.Context, id, name string, updatedAt time.Time) error {
+	return rename(ctx, r.coll, id, name, updatedAt)
+}
+
+// rename is shared by folders and files: same fields, same rules.
+// The unique index rejects a name that already exists in the same parent.
+func rename(ctx context.Context, coll *mongo.Collection, id, name string, updatedAt time.Time) error {
+	res, err := coll.UpdateOne(ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{"name": name, "updatedAt": updatedAt}},
+	)
+	if mongo.IsDuplicateKeyError(err) {
+		return ErrDuplicateName
+	}
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // ListByParent returns all subfolders of one folder, sorted by name.
