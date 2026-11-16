@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewUserAlwaysHasUserRole(t *testing.T) {
-	u := NewUser("1", "pera", "pera@example.com", "hash", time.Now())
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", time.Now())
 	if u.Role != RoleUser {
 		t.Fatalf("očekivana uloga %q, dobijena %q", RoleUser, u.Role)
 	}
@@ -17,15 +17,16 @@ func TestNewUserAlwaysHasUserRole(t *testing.T) {
 // pa se "role":"ADMIN" iz JSON-a ignorise, a NewUser uvek daje USER.
 func TestRegistrationRequestCannotSetRole(t *testing.T) {
 	var req struct {
-		Username string `json:"username"`
-		Email    string `json:"email"`
-		Password string `json:"password"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+		Email     string `json:"email"`
+		Password  string `json:"password"`
 	}
-	body := `{"username":"pera","email":"pera@example.com","password":"x","role":"ADMIN"}`
+	body := `{"firstName":"Pera","lastName":"Peric","email":"pera@example.com","password":"x","role":"ADMIN"}`
 	if err := json.Unmarshal([]byte(body), &req); err != nil {
 		t.Fatal(err)
 	}
-	u := NewUser("1", req.Username, req.Email, "hash", time.Now())
+	u := NewUser("1", req.FirstName, req.LastName, req.Email, "hash", time.Now())
 	if u.Role != RoleUser {
 		t.Fatalf("uloga se ne sme zadati zahtevom, dobijena %q", u.Role)
 	}
@@ -41,7 +42,7 @@ func TestRoleValid(t *testing.T) {
 }
 
 func TestPasswordHashNotSerialized(t *testing.T) {
-	u := NewUser("1", "pera", "pera@example.com", "tajna-hes", time.Now())
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "tajna-hes", time.Now())
 	b, _ := json.Marshal(u)
 	if string(b) == "" || contains(string(b), "tajna-hes") {
 		t.Fatalf("hes lozinke ne sme u JSON: %s", b)
@@ -55,4 +56,21 @@ func contains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+func TestNewUserDefaults(t *testing.T) {
+	now := time.Now()
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", now)
+	if !u.Active {
+		t.Error("novi korisnik treba da bude aktivan")
+	}
+	if u.QuotaBytes != DefaultQuotaBytes || DefaultQuotaBytes != 1<<30 {
+		t.Errorf("kvota = %d, očekivano 1 GiB", u.QuotaBytes)
+	}
+	if u.UsedBytes != 0 {
+		t.Errorf("usedBytes = %d, očekivano 0", u.UsedBytes)
+	}
+	if !u.PasswordChangedAt.Equal(now) {
+		t.Error("passwordChangedAt treba da bude trenutak kreiranja")
+	}
 }

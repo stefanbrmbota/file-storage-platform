@@ -22,6 +22,7 @@ var (
 // UserRepository je pristup kolekciji korisnika.
 type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (model.User, error)
+	FindByID(ctx context.Context, id string) (model.User, error)
 	Create(ctx context.Context, u model.User) error
 }
 
@@ -47,6 +48,18 @@ func NewUserRepository(ctx context.Context, db *mongo.Database) (*MongoUserRepos
 func (r *MongoUserRepository) FindByEmail(ctx context.Context, email string) (model.User, error) {
 	var u model.User
 	err := r.coll.FindOne(ctx, bson.D{{Key: "email", Value: email}}).Decode(&u)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return model.User{}, ErrNotFound
+	}
+	if err != nil {
+		return model.User{}, fmt.Errorf("repository: trazenje korisnika: %w", err)
+	}
+	return u, nil
+}
+
+func (r *MongoUserRepository) FindByID(ctx context.Context, id string) (model.User, error) {
+	var u model.User
+	err := r.coll.FindOne(ctx, bson.D{{Key: "_id", Value: id}}).Decode(&u)
 	if errors.Is(err, mongo.ErrNoDocuments) {
 		return model.User{}, ErrNotFound
 	}
