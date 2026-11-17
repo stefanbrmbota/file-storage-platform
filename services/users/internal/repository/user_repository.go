@@ -24,6 +24,10 @@ type UserRepository interface {
 	FindByEmail(ctx context.Context, email string) (model.User, error)
 	FindByID(ctx context.Context, id string) (model.User, error)
 	Create(ctx context.Context, u model.User) error
+	// Activate postavlja active=true; idempotentno. ErrNotFound ako nalog ne postoji.
+	Activate(ctx context.Context, id string) error
+	// Delete brise nalog (kompenzacija kad potvrda registracije ne moze da se posalje).
+	Delete(ctx context.Context, id string) error
 }
 
 // MongoUserRepository je MongoDB implementacija UserRepository.
@@ -75,6 +79,27 @@ func (r *MongoUserRepository) Create(ctx context.Context, u model.User) error {
 			return ErrEmailTaken
 		}
 		return fmt.Errorf("repository: upis korisnika: %w", err)
+	}
+	return nil
+}
+
+func (r *MongoUserRepository) Activate(ctx context.Context, id string) error {
+	res, err := r.coll.UpdateOne(ctx,
+		bson.D{{Key: "_id", Value: id}},
+		bson.D{{Key: "$set", Value: bson.D{{Key: "active", Value: true}}}},
+	)
+	if err != nil {
+		return fmt.Errorf("repository: aktivacija korisnika: %w", err)
+	}
+	if res.MatchedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
+func (r *MongoUserRepository) Delete(ctx context.Context, id string) error {
+	if _, err := r.coll.DeleteOne(ctx, bson.D{{Key: "_id", Value: id}}); err != nil {
+		return fmt.Errorf("repository: brisanje korisnika: %w", err)
 	}
 	return nil
 }

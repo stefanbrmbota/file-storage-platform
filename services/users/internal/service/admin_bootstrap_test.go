@@ -32,6 +32,26 @@ func (f *fakeRepo) FindByID(_ context.Context, id string) (model.User, error) {
 	return model.User{}, repository.ErrNotFound
 }
 
+func (f *fakeRepo) Activate(_ context.Context, id string) error {
+	for email, u := range f.users {
+		if u.ID == id {
+			u.Active = true
+			f.users[email] = u
+			return nil
+		}
+	}
+	return repository.ErrNotFound
+}
+
+func (f *fakeRepo) Delete(_ context.Context, id string) error {
+	for email, u := range f.users {
+		if u.ID == id {
+			delete(f.users, email)
+		}
+	}
+	return nil
+}
+
 func (f *fakeRepo) Create(_ context.Context, u model.User) error {
 	if _, ok := f.users[u.Email]; ok || f.raceOnNew {
 		return repository.ErrEmailTaken

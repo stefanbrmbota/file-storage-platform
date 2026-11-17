@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
@@ -15,19 +16,26 @@ import (
 // ErrEmailTaken se vraca kada nalog sa tim emailom vec postoji.
 var ErrEmailTaken = errors.New("service: email je vec zauzet")
 
+// ConfirmationIssuer izdaje token i salje mejl za potvrdu naloga.
+type ConfirmationIssuer interface {
+	Issue(ctx context.Context, u model.User) error
+}
+
 // RegistrationService kreira naloge novih korisnika (US-04).
 type RegistrationService struct {
 	repo       repository.UserRepository
+	issuer     ConfirmationIssuer
 	params     password.Params
 	quotaBytes int64
 	now        func() time.Time
 }
 
 // NewRegistrationService vraca servis. quotaBytes je podrazumevana kvota
-// novog naloga (iz konfiguracije).
-func NewRegistrationService(repo repository.UserRepository, params password.Params, quotaBytes int64) *RegistrationService {
+// novog naloga (iz konfiguracije), a issuer salje link za potvrdu.
+func NewRegistrationService(repo repository.UserRepository, issuer ConfirmationIssuer, params password.Params, quotaBytes int64) *RegistrationService {
 	return &RegistrationService{
 		repo:       repo,
+		issuer:     issuer,
 		params:     params,
 		quotaBytes: quotaBytes,
 		now:        func() time.Time { return time.Now().UTC() },
@@ -67,6 +75,17 @@ func (s *RegistrationService) Register(ctx context.Context, in RegistrationInput
 			return model.User{}, ErrEmailTaken
 		}
 		return model.User{}, fmt.Errorf("registracija: upis korisnika: %w", err)
+	}
+
+	if err := s.issuer.Issue(ctx, u); err != nil {
+		// Kompenzacija: bez poslatog linka nalog je neupotrebljiv, a email bi
+		// ostao zauzet. Brisanjem korisnik moze da pokusa ponovo.
+		dctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		if derr := s.repo.Delete(dctx, u.ID); derr != nil {
+			slog.Error("registracija: brisanje naloga posle neuspele potvrde nije uspelo", "userId", u.ID, "err", derr)
+		}
+		return model.User{}, fmt.Errorf("registracija: slanje potvrde: %w", err)
 	}
 	return u, nil
 }
