@@ -97,3 +97,33 @@ func TestFindNotFound(t *testing.T) {
 		t.Errorf("FindByID err = %v, očekivano ErrNotFound", err)
 	}
 }
+
+func TestActivateAndDelete(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+	u := model.NewUser("id-1", "Pera", "Peric", "pera@example.com", "h", 1<<30, time.Now().UTC())
+	if err := repo.Create(ctx, u); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := repo.Activate(ctx, "id-1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Activate(ctx, "id-1"); err != nil { // idempotentno
+		t.Fatalf("ponovna aktivacija: %v", err)
+	}
+	got, err := repo.FindByID(ctx, "id-1")
+	if err != nil || !got.Active {
+		t.Fatalf("active = %v, err = %v", got.Active, err)
+	}
+	if err := repo.Activate(ctx, "nema"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("Activate nepostojećeg: err = %v, očekivano ErrNotFound", err)
+	}
+
+	if err := repo.Delete(ctx, "id-1"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.FindByID(ctx, "id-1"); !errors.Is(err, ErrNotFound) {
+		t.Errorf("posle brisanja: err = %v, očekivano ErrNotFound", err)
+	}
+}

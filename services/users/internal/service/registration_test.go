@@ -14,7 +14,7 @@ const testQuota int64 = 5 << 30
 
 func TestRegister_CreatesInactiveAccount(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewRegistrationService(repo, testParams, testQuota)
+	svc := NewRegistrationService(repo, &fakeIssuer{}, testParams, testQuota)
 
 	in := validInput()
 	in.Email = "  Pera@Example.COM "
@@ -52,7 +52,7 @@ func TestRegister_CreatesInactiveAccount(t *testing.T) {
 
 func TestRegister_EmailTaken(t *testing.T) {
 	repo := newFakeRepo()
-	svc := NewRegistrationService(repo, testParams, testQuota)
+	svc := NewRegistrationService(repo, &fakeIssuer{}, testParams, testQuota)
 	ctx := context.Background()
 
 	if _, err := svc.Register(ctx, validInput()); err != nil {
@@ -71,8 +71,27 @@ func TestRegister_EmailTaken(t *testing.T) {
 func TestRegister_RaceReturnsEmailTaken(t *testing.T) {
 	repo := newFakeRepo()
 	repo.raceOnNew = true
-	svc := NewRegistrationService(repo, testParams, testQuota)
+	svc := NewRegistrationService(repo, &fakeIssuer{}, testParams, testQuota)
 	if _, err := svc.Register(context.Background(), validInput()); !errors.Is(err, ErrEmailTaken) {
 		t.Fatalf("err = %v, očekivano ErrEmailTaken", err)
+	}
+}
+
+func TestRegister_MailFailureRemovesAccount(t *testing.T) {
+	repo := newFakeRepo()
+	svc := NewRegistrationService(repo, &fakeIssuer{err: errors.New("smtp pao")}, testParams, testQuota)
+	ctx := context.Background()
+
+	if _, err := svc.Register(ctx, validInput()); err == nil {
+		t.Fatal("očekivana greška kad slanje potvrde ne uspe")
+	}
+	if len(repo.users) != 0 {
+		t.Fatalf("nalog treba da bude obrisan, ostalo: %v", repo.users)
+	}
+
+	// Ista adresa može ponovo da pokuša registraciju.
+	svc = NewRegistrationService(repo, &fakeIssuer{}, testParams, testQuota)
+	if _, err := svc.Register(ctx, validInput()); err != nil {
+		t.Fatalf("ponovna registracija: %v", err)
 	}
 }

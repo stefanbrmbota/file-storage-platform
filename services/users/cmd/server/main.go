@@ -13,8 +13,10 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	svcclient "github.com/stefanbrmbota/file-storage-platform/services/users/internal/client"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/handler"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/mail"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/password"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
@@ -69,10 +71,27 @@ func main() {
 		logger.Warn("ADMIN_EMAIL i ADMIN_PASSWORD nisu postavljeni, admin nalog se ne kreira")
 	}
 
-	registration := service.NewRegistrationService(userRepo, params, cfg.DefaultQuotaBytes)
+	tokenRepo, err := repository.NewTokenRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("token repository init failed", "err", err)
+		os.Exit(1)
+	}
+
+	mailer := &mail.SMTPMailer{
+		Host:     cfg.SMTPHost,
+		Port:     cfg.SMTPPort,
+		From:     cfg.SMTPFrom,
+		User:     cfg.SMTPUser,
+		Password: cfg.SMTPPassword,
+		Timeout:  cfg.RequestTimeout,
+	}
+	filesClient := svcclient.NewFilesClient(cfg.FilesServiceURL, cfg.RequestTimeout)
+	confirmation := service.NewConfirmationService(userRepo, tokenRepo, mailer, filesClient, cfg.ConfirmationTTL, cfg.ConfirmURLBase)
+	registration := service.NewRegistrationService(userRepo, confirmation, params, cfg.DefaultQuotaBytes)
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", handler.RegisterHandler(registration))
+	mux.HandleFunc("POST /confirm", handler.ConfirmHandler(confirmation))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))

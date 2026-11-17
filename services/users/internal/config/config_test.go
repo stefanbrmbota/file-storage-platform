@@ -1,6 +1,9 @@
 package config
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestLoadDefaultQuota(t *testing.T) {
 	tests := []struct {
@@ -53,4 +56,41 @@ func TestLoad(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLoadConfirmationSettings(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevane vrednosti", func(t *testing.T) {
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.ConfirmationTTL != 24*time.Hour || cfg.SMTPPort != "1025" || cfg.FilesServiceURL != "http://localhost:8082" {
+			t.Errorf("neočekivane podrazumevane vrednosti: %+v", cfg)
+		}
+	})
+	t.Run("zadat rok", func(t *testing.T) {
+		t.Setenv("CONFIRMATION_TTL", "30m")
+		cfg, err := Load()
+		if err != nil || cfg.ConfirmationTTL != 30*time.Minute {
+			t.Fatalf("ttl = %v, err = %v", cfg.ConfirmationTTL, err)
+		}
+	})
+	for _, bad := range []string{"abc", "0s", "-1h"} {
+		t.Run("neispravan rok "+bad, func(t *testing.T) {
+			t.Setenv("CONFIRMATION_TTL", bad)
+			if _, err := Load(); err == nil {
+				t.Fatal("očekivana greška")
+			}
+		})
+	}
+	t.Run("SMTP_USER bez lozinke", func(t *testing.T) {
+		t.Setenv("SMTP_USER", "u")
+		t.Setenv("SMTP_PASSWORD", "")
+		if _, err := Load(); err == nil {
+			t.Fatal("očekivana greška")
+		}
+	})
 }
