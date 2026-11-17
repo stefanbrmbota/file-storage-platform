@@ -49,7 +49,7 @@ func newTestRepo(t *testing.T) *MongoUserRepository {
 func TestCreateAndFind(t *testing.T) {
 	repo := newTestRepo(t)
 	ctx := context.Background()
-	want := model.NewUser("id-1", "Pera", "Peric", "pera@example.com", "hash", time.Now().UTC().Truncate(time.Millisecond))
+	want := model.NewUser("id-1", "Pera", "Peric", "pera@example.com", "hash", 1<<30, time.Now().UTC().Truncate(time.Millisecond))
 
 	if err := repo.Create(ctx, want); err != nil {
 		t.Fatal(err)
@@ -65,8 +65,8 @@ func TestCreateAndFind(t *testing.T) {
 	}
 	for name, got := range map[string]model.User{"email": byEmail, "id": byID} {
 		if got.ID != want.ID || got.FirstName != "Pera" || got.LastName != "Peric" ||
-			got.PasswordHash != "hash" || got.Role != model.RoleUser || !got.Active ||
-			got.QuotaBytes != model.DefaultQuotaBytes || got.UsedBytes != 0 ||
+			got.PasswordHash != "hash" || got.Role != model.RoleUser || got.Active ||
+			got.QuotaBytes != 1<<30 || got.UsedBytes != 0 ||
 			!got.PasswordChangedAt.Equal(want.PasswordChangedAt) {
 			t.Errorf("%s: dobijeno %+v, očekivano %+v", name, got, want)
 		}
@@ -78,10 +78,10 @@ func TestCreateDuplicateEmail(t *testing.T) {
 	ctx := context.Background()
 	now := time.Now().UTC()
 
-	if err := repo.Create(ctx, model.NewUser("id-1", "Pera", "Peric", "pera@example.com", "h", now)); err != nil {
+	if err := repo.Create(ctx, model.NewUser("id-1", "Pera", "Peric", "pera@example.com", "h", 1<<30, now)); err != nil {
 		t.Fatal(err)
 	}
-	err := repo.Create(ctx, model.NewUser("id-2", "Mika", "Mikic", "pera@example.com", "h", now))
+	err := repo.Create(ctx, model.NewUser("id-2", "Mika", "Mikic", "pera@example.com", "h", 1<<30, now))
 	if !errors.Is(err, ErrEmailTaken) {
 		t.Fatalf("err = %v, očekivano ErrEmailTaken", err)
 	}

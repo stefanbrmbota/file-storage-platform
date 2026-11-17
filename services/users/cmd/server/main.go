@@ -14,6 +14,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/handler"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/password"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
@@ -54,7 +55,7 @@ func main() {
 
 	// US-24: inicijalni admin nalog iz env promenljivih (ako vec ne postoji).
 	if cfg.AdminConfigured() {
-		created, err := service.EnsureAdmin(startCtx, userRepo, cfg.AdminEmail, cfg.AdminPassword, params)
+		created, err := service.EnsureAdmin(startCtx, userRepo, cfg.AdminEmail, cfg.AdminPassword, cfg.DefaultQuotaBytes, params)
 		if err != nil {
 			logger.Error("kreiranje admin naloga nije uspelo", "err", err)
 			os.Exit(1)
@@ -68,7 +69,10 @@ func main() {
 		logger.Warn("ADMIN_EMAIL i ADMIN_PASSWORD nisu postavljeni, admin nalog se ne kreira")
 	}
 
+	registration := service.NewRegistrationService(userRepo, params, cfg.DefaultQuotaBytes)
+
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /register", handler.RegisterHandler(registration))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))

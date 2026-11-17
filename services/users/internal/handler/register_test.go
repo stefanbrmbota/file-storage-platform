@@ -8,7 +8,9 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
 )
 
@@ -18,10 +20,13 @@ type fakeRegistrar struct {
 	err    error
 }
 
-func (f *fakeRegistrar) Register(_ context.Context, in service.RegistrationInput) error {
+func (f *fakeRegistrar) Register(_ context.Context, in service.RegistrationInput) (model.User, error) {
 	f.called = true
 	f.got = in
-	return f.err
+	if f.err != nil {
+		return model.User{}, f.err
+	}
+	return model.NewUser("id-1", in.FirstName, in.LastName, in.Email, "tajni-hes", 1<<30, time.Now()), nil
 }
 
 const validBody = `{"firstName":"Pera","lastName":"Perić","email":"pera@example.com","password":"Zeleni#Konj7","passwordConfirm":"Zeleni#Konj7"}`
@@ -85,6 +90,28 @@ func TestRegisterHandler_Valid(t *testing.T) {
 	}
 	if !reg.called || reg.got.Email != "pera@example.com" {
 		t.Fatalf("Registrar nije pozvan sa zahtevom: %+v", reg.got)
+	}
+	body := rec.Body.String()
+	if strings.Contains(body, "tajni-hes") || strings.Contains(body, "Zeleni#Konj7") {
+		t.Errorf("odgovor ne sme sadržati lozinku ni heš: %s", body)
+	}
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+	if resp["active"] != false || resp["email"] != "pera@example.com" {
+		t.Errorf("neočekivan odgovor: %s", body)
+	}
+}
+
+func TestRegisterHandler_EmailTaken(t *testing.T) {
+	reg := &fakeRegistrar{err: service.ErrEmailTaken}
+	rec := doRegister(reg, validBody)
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("status = %d, očekivano 409", rec.Code)
+	}
+	if msg := errorOf(t, rec); !strings.Contains(msg, "zauzet") {
+		t.Errorf("poruka %q", msg)
 	}
 }
 
