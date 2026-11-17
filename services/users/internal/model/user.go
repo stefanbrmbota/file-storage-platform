@@ -15,9 +15,6 @@ func (r Role) Valid() bool {
 	return r == RoleUser || r == RoleAdmin
 }
 
-// DefaultQuotaBytes je podrazumevana kvota novog korisnika (1 GiB).
-const DefaultQuotaBytes int64 = 1 << 30
-
 // User je nalog korisnika. PasswordHash se nikad ne serijalizuje ka klijentu.
 type User struct {
 	ID                string    `json:"id" bson:"_id"`
@@ -33,10 +30,11 @@ type User struct {
 	CreatedAt         time.Time `json:"createdAt" bson:"createdAt"`
 }
 
-// NewUser pravi novog korisnika za registraciju. Uloga se ne prosledjuje:
-// uvek je USER, pa je zahtev za registraciju ne moze zadati. Admin se
-// postavlja iskljucivo van registracije.
-func NewUser(id, firstName, lastName, email, passwordHash string, now time.Time) User {
+// NewUser pravi novog korisnika za registraciju. Nalog je neaktivan dok se ne
+// aktivira. Kvota dolazi iz konfiguracije. Uloga se ne prosledjuje: uvek je
+// USER, pa je zahtev za registraciju ne moze zadati. Admin se postavlja
+// iskljucivo van registracije.
+func NewUser(id, firstName, lastName, email, passwordHash string, quotaBytes int64, now time.Time) User {
 	return User{
 		ID:                id,
 		FirstName:         firstName,
@@ -44,8 +42,8 @@ func NewUser(id, firstName, lastName, email, passwordHash string, now time.Time)
 		Email:             email,
 		PasswordHash:      passwordHash,
 		Role:              RoleUser,
-		Active:            true,
-		QuotaBytes:        DefaultQuotaBytes,
+		Active:            false,
+		QuotaBytes:        quotaBytes,
 		UsedBytes:         0,
 		PasswordChangedAt: now,
 		CreatedAt:         now,
@@ -53,9 +51,10 @@ func NewUser(id, firstName, lastName, email, passwordHash string, now time.Time)
 }
 
 // NewAdmin pravi admin nalog. Koristi se iskljucivo pri pokretanju servisa
-// (US-24), nikad iz zahteva za registraciju.
-func NewAdmin(id, firstName, lastName, email, passwordHash string, now time.Time) User {
-	u := NewUser(id, firstName, lastName, email, passwordHash, now)
+// (US-24), nikad iz zahteva za registraciju. Admin je odmah aktivan.
+func NewAdmin(id, firstName, lastName, email, passwordHash string, quotaBytes int64, now time.Time) User {
+	u := NewUser(id, firstName, lastName, email, passwordHash, quotaBytes, now)
 	u.Role = RoleAdmin
+	u.Active = true
 	return u
 }

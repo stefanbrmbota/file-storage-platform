@@ -45,7 +45,7 @@ var testParams = password.Params{Memory: 64, Time: 1, Threads: 1, SaltLen: 16, K
 
 func TestEnsureAdmin_CreatesAdmin(t *testing.T) {
 	repo := newFakeRepo()
-	created, err := EnsureAdmin(context.Background(), repo, "admin@example.com", "tajna-lozinka", testParams)
+	created, err := EnsureAdmin(context.Background(), repo, "admin@example.com", "tajna-lozinka", 1<<30, testParams)
 	if err != nil || !created {
 		t.Fatalf("created=%v err=%v", created, err)
 	}
@@ -64,12 +64,12 @@ func TestEnsureAdmin_CreatesAdmin(t *testing.T) {
 func TestEnsureAdmin_Idempotent(t *testing.T) {
 	repo := newFakeRepo()
 	ctx := context.Background()
-	if _, err := EnsureAdmin(ctx, repo, "admin@example.com", "tajna", testParams); err != nil {
+	if _, err := EnsureAdmin(ctx, repo, "admin@example.com", "tajna", 1<<30, testParams); err != nil {
 		t.Fatal(err)
 	}
 	first := repo.users["admin@example.com"]
 
-	created, err := EnsureAdmin(ctx, repo, "admin@example.com", "druga-lozinka", testParams)
+	created, err := EnsureAdmin(ctx, repo, "admin@example.com", "druga-lozinka", 1<<30, testParams)
 	if err != nil || created {
 		t.Fatalf("created=%v err=%v", created, err)
 	}
@@ -81,17 +81,17 @@ func TestEnsureAdmin_Idempotent(t *testing.T) {
 func TestEnsureAdmin_RaceIsNotAnError(t *testing.T) {
 	repo := newFakeRepo()
 	repo.raceOnNew = true
-	created, err := EnsureAdmin(context.Background(), repo, "admin@example.com", "tajna", testParams)
+	created, err := EnsureAdmin(context.Background(), repo, "admin@example.com", "tajna", 1<<30, testParams)
 	if err != nil || created {
 		t.Fatalf("created=%v err=%v", created, err)
 	}
 }
 
 func TestEnsureAdmin_RequiresCredentials(t *testing.T) {
-	if _, err := EnsureAdmin(context.Background(), newFakeRepo(), "", "x", testParams); err == nil {
+	if _, err := EnsureAdmin(context.Background(), newFakeRepo(), "", "x", 1<<30, testParams); err == nil {
 		t.Error("prazan email treba da bude greska")
 	}
-	if _, err := EnsureAdmin(context.Background(), newFakeRepo(), "a@b.c", "", testParams); err == nil {
+	if _, err := EnsureAdmin(context.Background(), newFakeRepo(), "a@b.c", "", 1<<30, testParams); err == nil {
 		t.Error("prazna lozinka treba da bude greska")
 	}
 }

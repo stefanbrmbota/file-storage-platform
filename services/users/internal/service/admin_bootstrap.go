@@ -21,11 +21,12 @@ const (
 // EnsureAdmin pravi admin nalog ako ne postoji nalog sa datim emailom (US-24).
 // Lozinka se hesira paketom password. Vraca true ako je nalog kreiran, false
 // ako je vec postojao. Ponovni poziv ne pravi duplikat.
-func EnsureAdmin(ctx context.Context, repo repository.UserRepository, email, plainPassword string, params password.Params) (bool, error) {
+func EnsureAdmin(ctx context.Context, repo repository.UserRepository, email, plainPassword string, quotaBytes int64, params password.Params) (bool, error) {
 	if email == "" || plainPassword == "" {
 		return false, errors.New("admin: email i lozinka su obavezni")
 	}
 
+	email = NormalizeEmail(email)
 	_, err := repo.FindByEmail(ctx, email)
 	switch {
 	case err == nil:
@@ -43,7 +44,7 @@ func EnsureAdmin(ctx context.Context, repo repository.UserRepository, email, pla
 		return false, err
 	}
 
-	err = repo.Create(ctx, model.NewAdmin(id, adminFirstName, adminLastName, email, hash, time.Now().UTC()))
+	err = repo.Create(ctx, model.NewAdmin(id, adminFirstName, adminLastName, email, hash, quotaBytes, time.Now().UTC()))
 	if errors.Is(err, repository.ErrEmailTaken) {
 		// Druga instanca servisa je upravo napravila nalog.
 		return false, nil

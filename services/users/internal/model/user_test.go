@@ -7,7 +7,7 @@ import (
 )
 
 func TestNewUserAlwaysHasUserRole(t *testing.T) {
-	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", time.Now())
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", 1<<30, time.Now())
 	if u.Role != RoleUser {
 		t.Fatalf("očekivana uloga %q, dobijena %q", RoleUser, u.Role)
 	}
@@ -26,7 +26,7 @@ func TestRegistrationRequestCannotSetRole(t *testing.T) {
 	if err := json.Unmarshal([]byte(body), &req); err != nil {
 		t.Fatal(err)
 	}
-	u := NewUser("1", req.FirstName, req.LastName, req.Email, "hash", time.Now())
+	u := NewUser("1", req.FirstName, req.LastName, req.Email, "hash", 1<<30, time.Now())
 	if u.Role != RoleUser {
 		t.Fatalf("uloga se ne sme zadati zahtevom, dobijena %q", u.Role)
 	}
@@ -42,7 +42,7 @@ func TestRoleValid(t *testing.T) {
 }
 
 func TestPasswordHashNotSerialized(t *testing.T) {
-	u := NewUser("1", "Pera", "Peric", "pera@example.com", "tajna-hes", time.Now())
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "tajna-hes", 1<<30, time.Now())
 	b, _ := json.Marshal(u)
 	if string(b) == "" || contains(string(b), "tajna-hes") {
 		t.Fatalf("hes lozinke ne sme u JSON: %s", b)
@@ -60,17 +60,24 @@ func contains(s, sub string) bool {
 
 func TestNewUserDefaults(t *testing.T) {
 	now := time.Now()
-	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", now)
-	if !u.Active {
-		t.Error("novi korisnik treba da bude aktivan")
+	u := NewUser("1", "Pera", "Peric", "pera@example.com", "hash", 5<<30, now)
+	if u.Active {
+		t.Error("novi korisnik treba da bude neaktivan")
 	}
-	if u.QuotaBytes != DefaultQuotaBytes || DefaultQuotaBytes != 1<<30 {
-		t.Errorf("kvota = %d, očekivano 1 GiB", u.QuotaBytes)
+	if u.QuotaBytes != 5<<30 {
+		t.Errorf("kvota = %d, očekivano vrednost iz argumenta", u.QuotaBytes)
 	}
 	if u.UsedBytes != 0 {
 		t.Errorf("usedBytes = %d, očekivano 0", u.UsedBytes)
 	}
 	if !u.PasswordChangedAt.Equal(now) {
 		t.Error("passwordChangedAt treba da bude trenutak kreiranja")
+	}
+}
+
+func TestNewAdminIsActive(t *testing.T) {
+	a := NewAdmin("1", "Admin", "Admin", "a@example.com", "hash", 1<<30, time.Now())
+	if a.Role != RoleAdmin || !a.Active {
+		t.Errorf("admin treba da bude aktivan ADMIN: %+v", a)
 	}
 }
