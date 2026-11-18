@@ -1,0 +1,56 @@
+# syntax=docker/dockerfile:1
+#
+# Šablon multi-stage Dockerfile-a za Go servise (US-33, T-33.1).
+#
+# Upotreba: kopirati u services/<SERVICE>/Dockerfile (ili api-gateway/Dockerfile)
+# i zameniti <SERVICE_DIR>, <SERVICE> i <PORT>.
+#
+# Build kontekst je ROOT repozitorijuma, da bi deljeni paketi iz pkg/
+# (npr. pkg/envconfig preko replace direktive) bili dostupni pri build-u:
+#
+#   docker build -f <SERVICE_DIR>/Dockerfile -t fsp-<SERVICE> .
+#
+# Konfiguracija se zadaje SAMO preko env promenljivih pri pokretanju
+# (docker run --env-file ...); u image ne ulaze .env fajlovi ni tajne.
+
+# ---- build stage ----------------------------------------------------------
+FROM golang:1.27-alpine AS build
+
+WORKDIR /src
+
+# Deljeni paketi (replace => ../../pkg/...). Kopiraju se pre go.mod da bi
+# go mod download mogao da ih razreši.
+COPY pkg/ ./pkg/
+
+# Prvo samo go.mod/go.sum: sloj sa zavisnostima se kešira dok se oni ne promene.
+# go.sum* jer modul bez spoljnih zavisnosti nema go.sum.
+COPY <SERVICE_DIR>/go.mod <SERVICE_DIR>/go.sum* ./<SERVICE_DIR>/
+WORKDIR /src/<SERVICE_DIR>
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download && go mod verify
+
+# Zatim izvorni kod servisa.
+COPY <SERVICE_DIR>/ ./
+
+# Statički binarni fajl:
+#   CGO_ENABLED=0  - bez libc zavisnosti (radi na distroless/static)
+#   -trimpath      - bez lokalnih putanja u binarnom fajlu
+#   -ldflags -s -w - bez debug simbola (manji image)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" \
+    -o /out/<SERVICE> ./cmd/server
+
+# ---- runtime stage --------------------------------------------------------
+# distroless/static: bez shell-a i package manager-a (manja površina napada),
+# sadrži CA sertifikate i tzdata. Tag :nonroot pokreće proces kao UID 65532.
+FROM gcr.io/distroless/static-debian12:nonroot
+
+COPY --from=build /out/<SERVICE> /app/<SERVICE>
+
+USER nonroot:nonroot
+
+# Samo dokumentacija; stvarni port dolazi iz <SERVICE>_PORT env promenljive.
+EXPOSE <PORT>
+
+ENTRYPOINT ["/app/<SERVICE>"]

@@ -48,3 +48,8 @@ go build ./...
 go test ./...
 go run ./cmd/server
 ```
+Docker image se gradi iz ROOT-a repoa (ne iz foldera servisa), jer servisi koriste `pkg/` preko `replace`. Šablon: `docker/Dockerfile.template`.
+```
+docker build -f services/<servis>/Dockerfile -t fsp-<servis> .
+docker build -f api-gateway/Dockerfile -t fsp-gateway .
+```

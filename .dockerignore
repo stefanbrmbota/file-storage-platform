@@ -1,0 +1,21 @@
+# Build kontekst je root repozitorijuma (vidi docker/Dockerfile.template).
+# Tajne i lokalni fajlovi nikad ne ulaze u image.
+.git
+.github
+.claude
+.vscode
+.idea
+
+**/.env
+**/.env.*
+
+docs
+*.md
+**/*.md
+
+# Testovi, lokalni binarni fajlovi i artefakti nisu potrebni za build.
+**/*_test.go
+**/*.exe
+**/*.test
+**/*.out
+**/coverage.*
