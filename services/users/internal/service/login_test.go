@@ -13,10 +13,28 @@ import (
 )
 
 type fakeOTPIssuer struct {
-	code   string
+	code      string
+	err       error
+	verifyErr error
+	userID    string
+	calls     int
+	verified  struct{ userID, code string }
+}
+
+func (f *fakeOTPIssuer) Verify(_ context.Context, userID, code string) error {
+	f.verified.userID, f.verified.code = userID, code
+	return f.verifyErr
+}
+
+type fakeTokenIssuer struct {
 	err    error
 	userID string
-	calls  int
+	role   model.Role
+}
+
+func (f *fakeTokenIssuer) Issue(userID string, role model.Role) (string, error) {
+	f.userID, f.role = userID, role
+	return "jwt-token", f.err
 }
 
 func (f *fakeOTPIssuer) Generate(_ context.Context, userID string) (string, error) {
@@ -29,6 +47,7 @@ type loginEnv struct {
 	svc    *LoginService
 	repo   *fakeRepo
 	otp    *fakeOTPIssuer
+	tokens *fakeTokenIssuer
 	mailer *fakeMailer
 }
 
@@ -45,11 +64,12 @@ func newLoginEnv(t *testing.T, active bool) *loginEnv {
 
 	otp := &fakeOTPIssuer{code: "042517"}
 	mailer := &fakeMailer{}
-	svc, err := NewLoginService(repo, otp, mailer, 5*time.Minute, testParams)
+	tokens := &fakeTokenIssuer{}
+	svc, err := NewLoginService(repo, otp, tokens, mailer, 5*time.Minute, testParams)
 	if err != nil {
 		t.Fatal(err)
 	}
-	return &loginEnv{svc: svc, repo: repo, otp: otp, mailer: mailer}
+	return &loginEnv{svc: svc, repo: repo, otp: otp, tokens: tokens, mailer: mailer}
 }
 
 func TestLoginStart_SendsOTP(t *testing.T) {
@@ -124,6 +144,76 @@ func TestLoginStart_Failures(t *testing.T) {
 		env.repo.users[u.Email] = u
 		err := env.svc.Start(context.Background(), "pera@example.com", "x")
 		if err == nil || errors.Is(err, ErrInvalidCredentials) {
+			t.Fatalf("err = %v, ocekivana interna greska", err)
+		}
+	})
+}
+
+func TestLoginFinish_IssuesTokenWithRole(t *testing.T) {
+	env := newLoginEnv(t, true)
+	tok, err := env.svc.Finish(context.Background(), " Pera@Example.com ", "042517")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if tok != "jwt-token" {
+		t.Errorf("token = %q", tok)
+	}
+	if env.otp.verified.userID != "u1" || env.otp.verified.code != "042517" {
+		t.Errorf("Verify pozvan sa %+v", env.otp.verified)
+	}
+	if env.tokens.userID != "u1" || env.tokens.role != model.RoleUser {
+		t.Errorf("token izdat za %q / %q", env.tokens.userID, env.tokens.role)
+	}
+}
+
+func TestLoginFinish_InvalidOTP(t *testing.T) {
+	t.Run("pogresan kod", func(t *testing.T) {
+		env := newLoginEnv(t, true)
+		env.otp.verifyErr = ErrInvalidOTP
+		_, err := env.svc.Finish(context.Background(), "pera@example.com", "000000")
+		if !errors.Is(err, ErrInvalidOTP) {
+			t.Fatalf("err = %v", err)
+		}
+		if env.tokens.userID != "" {
+			t.Error("token ne sme biti izdat")
+		}
+	})
+	t.Run("nepostojeci nalog", func(t *testing.T) {
+		env := newLoginEnv(t, true)
+		_, err := env.svc.Finish(context.Background(), "nema@example.com", "000000")
+		if !errors.Is(err, ErrInvalidOTP) {
+			t.Fatalf("err = %v", err)
+		}
+		if env.otp.verified.userID != "" {
+			t.Error("Verify se ne sme pozivati za nepostojeci nalog")
+		}
+	})
+	t.Run("neaktivan nalog", func(t *testing.T) {
+		env := newLoginEnv(t, false)
+		_, err := env.svc.Finish(context.Background(), "pera@example.com", "000000")
+		if !errors.Is(err, ErrInvalidOTP) {
+			t.Fatalf("err = %v", err)
+		}
+		if env.tokens.userID != "" {
+			t.Error("token ne sme biti izdat")
+		}
+	})
+}
+
+func TestLoginFinish_InternalErrors(t *testing.T) {
+	t.Run("verify greska", func(t *testing.T) {
+		env := newLoginEnv(t, true)
+		env.otp.verifyErr = errors.New("baza pala")
+		_, err := env.svc.Finish(context.Background(), "pera@example.com", "000000")
+		if err == nil || errors.Is(err, ErrInvalidOTP) {
+			t.Fatalf("err = %v, ocekivana interna greska", err)
+		}
+	})
+	t.Run("token greska", func(t *testing.T) {
+		env := newLoginEnv(t, true)
+		env.tokens.err = errors.New("potpis pao")
+		_, err := env.svc.Finish(context.Background(), "pera@example.com", "000000")
+		if err == nil || errors.Is(err, ErrInvalidOTP) {
 			t.Fatalf("err = %v, ocekivana interna greska", err)
 		}
 	})

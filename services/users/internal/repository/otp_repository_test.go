@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"sync"
 	"testing"
 	"time"
 
@@ -111,4 +112,61 @@ func TestOTPRepo_HasTTLIndex(t *testing.T) {
 		}
 	}
 	t.Error("TTL indeks ttl_expiresAt ne postoji")
+}
+
+func TestOTPRepo_IncrementAttempts(t *testing.T) {
+	repo, _ := newTestOTPRepo(t)
+	ctx := context.Background()
+	_ = repo.Save(ctx, model.OTP{UserID: "u1", CodeHash: "h", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+
+	for want := 1; want <= 3; want++ {
+		o, err := repo.IncrementAttempts(ctx, "u1")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if o.Attempts != want {
+			t.Errorf("Attempts = %d, ocekivano %d", o.Attempts, want)
+		}
+	}
+	if _, err := repo.IncrementAttempts(ctx, "nema"); !errors.Is(err, ErrOTPNotFound) {
+		t.Errorf("err = %v, ocekivano ErrOTPNotFound", err)
+	}
+}
+
+func TestOTPRepo_IncrementAttempts_Concurrent(t *testing.T) {
+	repo, _ := newTestOTPRepo(t)
+	ctx := context.Background()
+	_ = repo.Save(ctx, model.OTP{UserID: "u1", CodeHash: "h", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+
+	const n = 20
+	var wg sync.WaitGroup
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = repo.IncrementAttempts(ctx, "u1")
+		}()
+	}
+	wg.Wait()
+
+	o, _ := repo.Get(ctx, "u1")
+	if o.Attempts != n {
+		t.Errorf("Attempts = %d, ocekivano %d", o.Attempts, n)
+	}
+}
+
+func TestOTPRepo_Delete(t *testing.T) {
+	repo, _ := newTestOTPRepo(t)
+	ctx := context.Background()
+	_ = repo.Save(ctx, model.OTP{UserID: "u1", CodeHash: "h", ExpiresAt: time.Now().UTC().Add(time.Minute)})
+
+	if err := repo.Delete(ctx, "u1"); err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Delete(ctx, "u1"); !errors.Is(err, ErrOTPNotFound) {
+		t.Errorf("drugo brisanje: err = %v, ocekivano ErrOTPNotFound", err)
+	}
+	if _, err := repo.Get(ctx, "u1"); !errors.Is(err, ErrOTPNotFound) {
+		t.Errorf("Get posle brisanja: err = %v", err)
+	}
 }

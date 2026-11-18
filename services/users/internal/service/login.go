@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/mail"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/password"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 )
@@ -15,15 +16,24 @@ import (
 // nalog. Namerno je jedna greška: ne otkriva da li nalog postoji.
 var ErrInvalidCredentials = errors.New("service: pogresni podaci za prijavu")
 
-// OTPIssuer generiše i čuva OTP za korisnika i vraća kod.
+// OTPIssuer generiše i proverava OTP korisnika. Generate vraća kod; Verify
+// vraća ErrInvalidOTP za svaki neuspeh i troši OTP pri uspehu.
 type OTPIssuer interface {
 	Generate(ctx context.Context, userID string) (string, error)
+	Verify(ctx context.Context, userID, code string) error
 }
 
-// LoginService izvodi prvi korak prijave (US-05): provera lozinke i slanje OTP-a.
+// TokenIssuer izdaje JWT za prijavljenog korisnika.
+type TokenIssuer interface {
+	Issue(userID string, role model.Role) (string, error)
+}
+
+// LoginService izvodi prijavu (US-05): prvi korak je provera lozinke i slanje
+// OTP-a, drugi provera OTP-a i izdavanje JWT-a.
 type LoginService struct {
 	users     repository.UserRepository
 	otp       OTPIssuer
+	tokens    TokenIssuer
 	mailer    mail.Mailer
 	otpTTL    time.Duration
 	dummyHash string
@@ -33,12 +43,12 @@ type LoginService struct {
 // heš se računa jednom, sa istim parametrima kao prave lozinke: kad nalog ne
 // postoji, lozinka se ipak proverava protiv njega, pa vreme odgovora ne
 // otkriva da li je email registrovan.
-func NewLoginService(users repository.UserRepository, otp OTPIssuer, mailer mail.Mailer, otpTTL time.Duration, params password.Params) (*LoginService, error) {
+func NewLoginService(users repository.UserRepository, otp OTPIssuer, tokens TokenIssuer, mailer mail.Mailer, otpTTL time.Duration, params password.Params) (*LoginService, error) {
 	dummy, err := password.Hash("lazna-lozinka-za-izjednacavanje-vremena", params)
 	if err != nil {
 		return nil, fmt.Errorf("prijava: lazni heš: %w", err)
 	}
-	return &LoginService{users: users, otp: otp, mailer: mailer, otpTTL: otpTTL, dummyHash: dummy}, nil
+	return &LoginService{users: users, otp: otp, tokens: tokens, mailer: mailer, otpTTL: otpTTL, dummyHash: dummy}, nil
 }
 
 // Start proverava email, lozinku i aktivnost naloga; ako je sve ispravno,
@@ -78,4 +88,33 @@ func (s *LoginService) Start(ctx context.Context, email, plainPassword string) e
 		return fmt.Errorf("prijava: slanje mejla: %w", err)
 	}
 	return nil
+}
+
+// Finish je drugi korak prijave: proverava OTP i, ako je tačan, izdaje JWT sa
+// ulogom korisnika. Nepostojeći ili neaktivan nalog i svaki neispravan OTP
+// vraćaju ErrInvalidOTP. Kod i token se ne loguju.
+func (s *LoginService) Finish(ctx context.Context, email, code string) (string, error) {
+	u, err := s.users.FindByEmail(ctx, NormalizeEmail(email))
+	if errors.Is(err, repository.ErrNotFound) {
+		return "", ErrInvalidOTP
+	}
+	if err != nil {
+		return "", fmt.Errorf("prijava: trazenje korisnika: %w", err)
+	}
+	if !u.Active {
+		return "", ErrInvalidOTP
+	}
+
+	if err := s.otp.Verify(ctx, u.ID, code); err != nil {
+		if errors.Is(err, ErrInvalidOTP) {
+			return "", ErrInvalidOTP
+		}
+		return "", fmt.Errorf("prijava: %w", err)
+	}
+
+	tok, err := s.tokens.Issue(u.ID, u.Role)
+	if err != nil {
+		return "", fmt.Errorf("prijava: izdavanje tokena: %w", err)
+	}
+	return tok, nil
 }

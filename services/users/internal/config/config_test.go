@@ -131,3 +131,25 @@ func TestLoadJWTSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadOTPMaxAttempts(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Setenv("OTP_MAX_ATTEMPTS", "")
+	cfg, err := Load()
+	if err != nil || cfg.OTPMaxAttempts != 5 {
+		t.Fatalf("podrazumevano: %v, %d", err, cfg.OTPMaxAttempts)
+	}
+	t.Setenv("OTP_MAX_ATTEMPTS", "3")
+	cfg, err = Load()
+	if err != nil || cfg.OTPMaxAttempts != 3 {
+		t.Fatalf("iz env: %v, %d", err, cfg.OTPMaxAttempts)
+	}
+	for _, bad := range []string{"0", "-1", "abc"} {
+		t.Setenv("OTP_MAX_ATTEMPTS", bad)
+		if _, err := Load(); err == nil {
+			t.Errorf("%q: ocekivana greska", bad)
+		}
+	}
+}
