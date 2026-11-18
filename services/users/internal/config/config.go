@@ -11,6 +11,9 @@ import (
 // defaultQuotaBytes je podrazumevana kvota novog korisnika (1 GiB).
 const defaultQuotaBytes int64 = 1 << 30
 
+// defaultOTPMaxAttempts je podrazumevani broj pokusaja unosa OTP-a.
+const defaultOTPMaxAttempts = 5
+
 // Config sadrzi podesavanja Users servisa. Vrednosti dolaze iskljucivo iz
 // env promenljivih, bez zakucanih adresa i lozinki.
 type Config struct {
@@ -32,8 +35,9 @@ type Config struct {
 	FilesServiceURL string
 	RequestTimeout  time.Duration // timeout za pozive drugih servisa i SMTP-a
 
-	OTPHMACSecret string        // tajna za HMAC OTP-a; nikad se ne loguje
-	OTPTTL        time.Duration // rok vazenja OTP-a
+	OTPHMACSecret  string        // tajna za HMAC OTP-a; nikad se ne loguje
+	OTPTTL         time.Duration // rok vazenja OTP-a
+	OTPMaxAttempts int           // najveci broj pokusaja unosa OTP-a
 
 	JWTSecret string        // tajna za potpis JWT-a; nikad se ne loguje
 	JWTTTL    time.Duration // rok vazenja JWT-a
@@ -83,6 +87,14 @@ func Load() (Config, error) {
 	}
 	if cfg.OTPTTL, err = getDuration("OTP_TTL", 5*time.Minute); err != nil {
 		return Config{}, err
+	}
+	cfg.OTPMaxAttempts = defaultOTPMaxAttempts
+	if v := os.Getenv("OTP_MAX_ATTEMPTS"); v != "" {
+		n, err := strconv.Atoi(v)
+		if err != nil || n <= 0 {
+			return Config{}, errors.New("config: OTP_MAX_ATTEMPTS mora biti pozitivan ceo broj")
+		}
+		cfg.OTPMaxAttempts = n
 	}
 	if cfg.JWTTTL, err = getDuration("JWT_TTL", 15*time.Minute); err != nil {
 		return Config{}, err

@@ -20,6 +20,7 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/password"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
+	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/token"
 )
 
 func main() {
@@ -89,8 +90,31 @@ func main() {
 	confirmation := service.NewConfirmationService(userRepo, tokenRepo, mailer, filesClient, cfg.ConfirmationTTL, cfg.ConfirmURLBase)
 	registration := service.NewRegistrationService(userRepo, confirmation, params, cfg.DefaultQuotaBytes)
 
+	otpRepo, err := repository.NewOTPRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("otp repository init failed", "err", err)
+		os.Exit(1)
+	}
+	otpService, err := service.NewOTPService(otpRepo, cfg.OTPHMACSecret, cfg.OTPTTL, cfg.OTPMaxAttempts)
+	if err != nil {
+		logger.Error("neispravna OTP konfiguracija (OTP_HMAC_SECRET, OTP_TTL)", "err", err)
+		os.Exit(1)
+	}
+	tokens, err := token.NewManager(cfg.JWTSecret, cfg.JWTTTL)
+	if err != nil {
+		logger.Error("neispravna JWT konfiguracija (JWT_SECRET, JWT_TTL)", "err", err)
+		os.Exit(1)
+	}
+	login, err := service.NewLoginService(userRepo, otpService, tokens, mailer, cfg.OTPTTL, params)
+	if err != nil {
+		logger.Error("login servis init failed", "err", err)
+		os.Exit(1)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", handler.RegisterHandler(registration))
+	mux.HandleFunc("POST /login", handler.LoginHandler(login))
+	mux.HandleFunc("POST /login/verify", handler.LoginVerifyHandler(login))
 	mux.HandleFunc("POST /confirm", handler.ConfirmHandler(confirmation))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

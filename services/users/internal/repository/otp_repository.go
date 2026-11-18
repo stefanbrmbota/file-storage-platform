@@ -20,6 +20,12 @@ type OTPRepository interface {
 	// Save upisuje OTP korisnika; postojeći se zamenjuje (i brojač pokušaja se resetuje).
 	Save(ctx context.Context, o model.OTP) error
 	Get(ctx context.Context, userID string) (model.OTP, error)
+	// IncrementAttempts atomično povećava brojač pokušaja i vraća zapis posle
+	// povećanja. ErrOTPNotFound ako korisnik nema OTP.
+	IncrementAttempts(ctx context.Context, userID string) (model.OTP, error)
+	// Delete briše OTP. ErrOTPNotFound ako ga nema; tako samo jedan od dva
+	// istovremena zahteva može da potroši isti OTP.
+	Delete(ctx context.Context, userID string) error
 }
 
 // MongoOTPRepository je MongoDB implementacija OTPRepository.
@@ -60,4 +66,31 @@ func (r *MongoOTPRepository) Get(ctx context.Context, userID string) (model.OTP,
 		return model.OTP{}, fmt.Errorf("repository: citanje otp-a: %w", err)
 	}
 	return o, nil
+}
+
+func (r *MongoOTPRepository) IncrementAttempts(ctx context.Context, userID string) (model.OTP, error) {
+	var o model.OTP
+	err := r.coll.FindOneAndUpdate(ctx,
+		bson.D{{Key: "_id", Value: userID}},
+		bson.D{{Key: "$inc", Value: bson.D{{Key: "attempts", Value: 1}}}},
+		options.FindOneAndUpdate().SetReturnDocument(options.After),
+	).Decode(&o)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return model.OTP{}, ErrOTPNotFound
+	}
+	if err != nil {
+		return model.OTP{}, fmt.Errorf("repository: povecanje pokusaja otp-a: %w", err)
+	}
+	return o, nil
+}
+
+func (r *MongoOTPRepository) Delete(ctx context.Context, userID string) error {
+	res, err := r.coll.DeleteOne(ctx, bson.D{{Key: "_id", Value: userID}})
+	if err != nil {
+		return fmt.Errorf("repository: brisanje otp-a: %w", err)
+	}
+	if res.DeletedCount == 0 {
+		return ErrOTPNotFound
+	}
+	return nil
 }
