@@ -31,6 +31,9 @@ type Config struct {
 	ConfirmationTTL time.Duration // rok vazenja linka za potvrdu
 	FilesServiceURL string
 	RequestTimeout  time.Duration // timeout za pozive drugih servisa i SMTP-a
+
+	OTPHMACSecret string        // tajna za HMAC OTP-a; nikad se ne loguje
+	OTPTTL        time.Duration // rok vazenja OTP-a
 }
 
 // Load cita konfiguraciju. Vraca gresku ako je podeseno samo jedno od
@@ -51,6 +54,7 @@ func Load() (Config, error) {
 		SMTPPassword:      os.Getenv("SMTP_PASSWORD"),
 		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/confirm"),
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
+		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
 	}
 	if (cfg.AdminEmail == "") != (cfg.AdminPassword == "") {
 		return Config{}, errors.New("config: ADMIN_EMAIL i ADMIN_PASSWORD moraju biti postavljeni zajedno")
@@ -71,6 +75,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.RequestTimeout, err = getDuration("USERS_REQUEST_TIMEOUT", 5*time.Second); err != nil {
+		return Config{}, err
+	}
+	if cfg.OTPTTL, err = getDuration("OTP_TTL", 5*time.Minute); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
