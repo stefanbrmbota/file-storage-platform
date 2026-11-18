@@ -111,11 +111,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	revokedRepo, err := repository.NewRevokedTokenRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("revoked token repository init failed", "err", err)
+		os.Exit(1)
+	}
+	logout := service.NewLogoutService(tokens, revokedRepo)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", handler.RegisterHandler(registration))
 	mux.HandleFunc("POST /login", handler.LoginHandler(login))
 	mux.HandleFunc("POST /login/verify", handler.LoginVerifyHandler(login))
 	mux.HandleFunc("POST /confirm", handler.ConfirmHandler(confirmation))
+	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))

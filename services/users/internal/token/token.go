@@ -1,7 +1,9 @@
-// Paket token izdaje i proverava JWT (HS256) sa claimovima userId, role i exp.
+// Paket token izdaje i proverava JWT (HS256) sa claimovima userId, role, jti i exp.
 package token
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"time"
@@ -19,10 +21,13 @@ const MinSecretLen = 32
 // ne otkriva razlog odbijanja.
 var ErrInvalidToken = errors.New("token: nevazeci token")
 
-// Claims su podaci iz proverenog tokena.
+// Claims su podaci iz proverenog tokena. ID (claim jti) i ExpiresAt služe za
+// opoziv tokena pri odjavi; ID je prazan kod tokena izdatih pre uvođenja jti.
 type Claims struct {
-	UserID string
-	Role   model.Role
+	UserID    string
+	Role      model.Role
+	ID        string
+	ExpiresAt time.Time
 }
 
 type claims struct {
@@ -57,10 +62,15 @@ func (m *Manager) Issue(userID string, role model.Role) (string, error) {
 	if !role.Valid() {
 		return "", errors.New("token: nepoznata uloga")
 	}
+	jti, err := newID()
+	if err != nil {
+		return "", err
+	}
 	now := m.now()
 	t := jwt.NewWithClaims(jwt.SigningMethodHS256, claims{
 		Role: role,
 		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        jti,
 			Subject:   userID,
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(now.Add(m.ttl)),
@@ -87,5 +97,14 @@ func (m *Manager) Parse(tokenString string) (Claims, error) {
 	if err != nil || c.Subject == "" || !c.Role.Valid() {
 		return Claims{}, ErrInvalidToken
 	}
-	return Claims{UserID: c.Subject, Role: c.Role}, nil
+	return Claims{UserID: c.Subject, Role: c.Role, ID: c.ID, ExpiresAt: c.ExpiresAt.Time}, nil
+}
+
+// newID vraća slučajan 128-bitni identifikator tokena (heksadecimalno) za jti.
+func newID() (string, error) {
+	b := make([]byte, 16)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("token: generisanje jti: %w", err)
+	}
+	return hex.EncodeToString(b), nil
 }
