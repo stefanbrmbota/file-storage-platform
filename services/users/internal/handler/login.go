@@ -48,11 +48,14 @@ func LoginHandler(l LoginStarter) http.HandlerFunc {
 		err := l.Start(ctx, req.Email, req.Password)
 		switch {
 		case err == nil:
+			logLoginAttempt(r, stepLogin, req.Email, outcomeSuccess)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "kod za prijavu je poslat na vaš mejl"})
 		case errors.Is(err, service.ErrInvalidCredentials):
+			logLoginAttempt(r, stepLogin, req.Email, outcomeFailure)
 			writeError(w, http.StatusUnauthorized, "pogrešan email ili lozinka")
 		default:
+			logLoginAttempt(r, stepLogin, req.Email, outcomeError)
 			slog.Error("prijava (prvi korak) nije uspela", "err", err)
 			writeError(w, http.StatusInternalServerError, "interna greška")
 		}

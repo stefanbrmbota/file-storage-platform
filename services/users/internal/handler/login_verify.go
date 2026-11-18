@@ -51,11 +51,14 @@ func LoginVerifyHandler(l LoginFinisher) http.HandlerFunc {
 		tok, err := l.Finish(ctx, req.Email, req.Code)
 		switch {
 		case err == nil:
+			logLoginAttempt(r, stepVerify, req.Email, outcomeSuccess)
 			w.Header().Set("Content-Type", "application/json")
 			_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
 		case errors.Is(err, service.ErrInvalidOTP):
+			logLoginAttempt(r, stepVerify, req.Email, outcomeFailure)
 			writeError(w, http.StatusUnauthorized, "neispravan ili istekao kod")
 		default:
+			logLoginAttempt(r, stepVerify, req.Email, outcomeError)
 			slog.Error("prijava (drugi korak) nije uspela", "err", err)
 			writeError(w, http.StatusInternalServerError, "interna greška")
 		}
