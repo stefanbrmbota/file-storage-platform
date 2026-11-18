@@ -6,7 +6,7 @@ Dokument opisuje arhitekturu platforme (US-29). Popunjava se po podtaskovima:
 |---|---|---|
 | T-29.1 | [Model podataka – Users i Files](#1-model-podataka--users-i-files) | gotovo |
 | T-29.2 | [Model podataka – Sharing](#2-model-podataka--sharing-neo4j), [Notifications](#3-model-podataka--notifications-cassandra), [Analytics i događaji](#4-model-podataka--analytics-cassandra-i-događaji) | gotovo |
-| — | Mapa komunikacije (sinhroni/asinhroni pozivi, endpointi, događaji) | sledi |
+| T-29.3 | [Mapa komunikacije](#5-mapa-komunikacije) | gotovo |
 
 ---
 
@@ -689,3 +689,322 @@ duži od bilo kog realnog ponavljanja isporuke.
 | Sharing | Neo4j | — | `:User`, `:Resource:Folder`, `:Resource:File`, `CONTAINS`, `HAS_ACCESS` |
 | Notifications | Cassandra | `notifications` | `notifications_by_user`, `unread_by_user`, `processed_events` |
 | Analytics | Cassandra | `analytics` | `events_by_user`, `daily_stats_by_user`, `daily_stats_global`, `downloads_by_file`, `processed_events` |
+
+---
+
+## 5. Mapa komunikacije
+
+Ova sekcija opisuje ko s kim komunicira, kako i zašto: spoljni API kroz
+gateway, sinhrone pozive između servisa i asinhrone događaje preko brokera.
+Oznaka *Planirano* znači da ruta ili poziv još ne postoje u kodu.
+
+Osnovna pravila:
+- **Spolja je dostupan samo API gateway.** Servisi, baze i broker su u
+  internoj mreži (Docker mreža, odnosno K8s klaster) i nemaju javne portove.
+- **Sinhrono** (HTTP/REST) samo kada pozivaocu odgovor treba odmah da bi
+  nastavio (provera prava, rezervacija kvote). Svaki takav poziv ima timeout
+  (`context.WithTimeout`).
+- **Asinhrono** (događaji preko brokera) za sve što je posledica već završene
+  radnje: sinhronizacija grafa, obaveštenja, statistika. Emiter ne čeka
+  potrošače, pa pad Notifications ili Analytics servisa ne blokira rad sa
+  datotekama.
+
+### 5.1 Dijagram servisa
+
+```mermaid
+flowchart LR
+    C[Klijent] -->|HTTPS + JWT| GW[API gateway]
+
+    subgraph mreza [Interna mreža]
+        GW --> U[Users]
+        GW --> F[Files]
+        GW --> S[Sharing]
+        GW --> N[Notifications]
+        GW --> A[Analytics]
+
+        U -->|S1 koren foldera| F
+        F -->|S2 provera prava| S
+        F -->|S3 kvota| U
+        S -->|S4 korisnik po mejlu| U
+        A -->|S5 vlasnik datoteke| F
+
+        U --- UDB[(MongoDB users)]
+        F --- FDB[(MongoDB files)]
+        F --- M[(MinIO)]
+        S --- SDB[(Neo4j)]
+        N --- NDB[(Cassandra notifications)]
+        A --- ADB[(Cassandra analytics)]
+
+        B{{Broker}}
+        U -.->|user.*, quota.*| B
+        F -.->|folder.*, file.*| B
+        S -.->|share.*| B
+        B -.-> F
+        B -.-> S
+        B -.-> N
+        B -.-> A
+    end
+
+    U -->|SMTP: potvrda, OTP| MAIL[Mejl server]
+```
+
+Pune linije su sinhroni HTTP pozivi (oznake S1–S5 odgovaraju tabeli u 5.4),
+isprekidane su događaji. Tačno ko koji događaj konzumira je u 5.5.
+
+### 5.2 Spoljni API (kroz gateway)
+
+Gateway prima zahteve na `/api/...`, uklanja prefiks `/api` i prosleđuje ih
+odgovarajućem servisu (npr. `POST /api/folders` → Files `POST /folders`).
+Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
+(`POST /api/auth/login` → Users `POST /login`).
+
+**Implementirano:**
+
+| Metoda i putanja (gateway) | Servis | JWT | Story | Opis |
+|---|---|---|---|---|
+| `POST /api/auth/register` | Users | ne | US-04 | Registracija; šalje mejl sa linkom za potvrdu. |
+| `POST /api/auth/confirm` | Users | ne | US-04 | Potvrda registracije tokenom iz linka (token u telu zahteva, ne u URL-u). |
+| `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. |
+| `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
+| `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
+| `GET /api/folders/{id}/contents` | Files | da | US-03 | Sadržaj foldera (podfolderi i datoteke). |
+
+**Planirano:**
+
+| Metoda i putanja (gateway) | Servis | JWT | Opis |
+|---|---|---|---|
+| `GET /api/users/me` | Users | da | Podaci o nalogu, kvota i zauzeće. |
+| `GET /api/admin/users` | Users | ADMIN | Admin pregled korisnika (US-24). |
+| `PATCH /api/folders/{id}` | Files | da | Preimenovanje ili premeštanje foldera. |
+| `DELETE /api/folders/{id}` | Files | da | Brisanje foldera sa sadržajem. |
+| `POST /api/folders/{id}/files` | Files | da | Otpremanje datoteke (`multipart/form-data`). |
+| `GET /api/files/{id}/content` | Files | da | Preuzimanje sadržaja (strim iz MinIO-a kroz Files servis). |
+| `PATCH /api/files/{id}` | Files | da | Preimenovanje ili premeštanje datoteke. |
+| `DELETE /api/files/{id}` | Files | da | Brisanje datoteke. |
+| `GET /api/search?q=` | Files | da | Pretraga sopstvenih datoteka po nazivu. |
+| `POST /api/shares` | Sharing | da | Deljenje: `{resourceId, resourceType, email, permission}`. |
+| `DELETE /api/shares/{resourceId}/{granteeId}` | Sharing | da | Ukidanje deljenja. |
+| `GET /api/shares/with-me` | Sharing | da | Resursi podeljeni sa mnom. |
+| `GET /api/shares/{resourceId}` | Sharing | da | S kim je moj resurs podeljen. |
+| `GET /api/notifications` | Notifications | da | Lista obaveštenja (stranice). |
+| `GET /api/notifications/unread-count` | Notifications | da | Broj nepročitanih. |
+| `POST /api/notifications/{id}/read` | Notifications | da | Označi kao pročitano. |
+| `POST /api/notifications/read-all` | Notifications | da | Označi sva kao pročitana. |
+| `GET /api/analytics/me?from=&to=` | Analytics | da | Moja dnevna statistika. |
+| `GET /api/analytics/me/events?month=` | Analytics | da | Moja aktivnost za mesec. |
+| `GET /api/analytics/files/{id}?from=&to=` | Analytics | da | Preuzimanja moje datoteke po danima. |
+| `GET /api/admin/analytics?from=&to=` | Analytics | ADMIN | Statistika cele platforme. |
+
+Rute za deljenje i preuzimanje tuđih resursa ne idu kroz poseban „shared“ API:
+klijent koristi iste Files rute (`/api/folders/{id}/contents`,
+`/api/files/{id}/content`), a Files servis sam proverava prava preko Sharing
+servisa (S2).
+
+### 5.3 Odgovornosti gateway-a
+
+1. **Provera JWT-a.** Token dolazi u `Authorization: Bearer <token>`. Gateway
+   proverava potpis (HS256, ista tajna `JWT_SECRET` kao u Users servisu) i rok
+   važenja (`exp`). Neispravan ili istekao token → `401 {"error": "unauthorized"}`.
+2. **Identitet ka servisima.** Gateway **briše** `X-User-ID` i `X-User-Role`
+   ako ih je klijent poslao, pa ih postavlja iz tokena (`sub` → `X-User-ID`,
+   `role` → `X-User-Role`). Servisi veruju samo ovim headerima i nikad ne
+   čitaju ID korisnika iz tela zahteva ili URL-a. Klijent zato ne može da se
+   predstavi kao drugi korisnik.
+3. **Uloge.** Rute `/api/admin/...` gateway propušta samo za `role = ADMIN`.
+   Servis tu proveru ponavlja (npr. `RequireRole` u Users servisu), pa jedna
+   greška u konfiguraciji gateway-a ne otvara admin funkcije.
+4. **Interne rute se ne izlažu.** Ništa sa `/internal/...` nije dostupno kroz
+   gateway, ni slučajno: gateway ima eksplicitnu listu ruta iz 5.2 i za sve
+   ostalo vraća `404`.
+5. **Timeout ka servisima** (`GATEWAY_UPSTREAM_TIMEOUT`); za otpremanje i
+   preuzimanje duži, jer zavisi od veličine datoteke. Ako servis ne odgovori:
+   `502`/`504` sa opštom porukom, bez internih detalja.
+6. **Adrese servisa** samo iz env promenljivih (`USERS_SERVICE_URL`,
+   `FILES_SERVICE_URL`, ...).
+
+*Planirano / predlog za IB (SC):* ograničenje broja zahteva na `/api/auth/*`
+(zaštita od pogađanja lozinke i OTP-a) i odbijanje tokena izdatih pre
+`passwordChangedAt` (zahteva poziv ka Users servisu ili kratak `JWT_TTL`, koji
+je već 15 min).
+
+### 5.4 Sinhroni pozivi između servisa
+
+Interne rute počinju sa `/internal/` i dostupne su samo u internoj mreži.
+
+| # | Pozivalac → servis | Endpoint | Kada | Zašto sinhrono | Timeout | Ako pozvani servis ne odgovori | Stanje |
+|---|---|---|---|---|---|---|---|
+| S1 | Users → Files | `POST /internal/folders/root` `{ownerId}` | Potvrda registracije | Nalog se aktivira tek kada korisnik ima koren; bez korena nalog je neupotrebljiv. | `USERS_REQUEST_TIMEOUT` (5s) | Token za potvrdu se vraća u bazu, nalog ostaje neaktivan, korisnik ponovo klikne link. Ruta je idempotentna. | implementirano |
+| S2 | Files → Sharing | `GET /internal/access?userId=&resourceId=` → `{isOwner, permission}` | Korisnik pristupa resursu čiji nije vlasnik | Odgovor odlučuje da li se zahtev izvršava. | `FILES_REQUEST_TIMEOUT` (5s) | **Odbija se** (`503`): bez potvrde prava nema pristupa (fail closed). Vlasnik svom resursu pristupa bez ovog poziva. | planirano |
+| S3 | Files → Users | `POST /internal/users/{id}/quota/reserve` `{bytes}` i `.../quota/release` `{bytes}` | Otpremanje i brisanje datoteke | Upload ne sme početi ako nema mesta; rezervacija mora biti atomična (`usedBytes + bytes ≤ quotaBytes` u jednom `UpdateOne`). | `FILES_REQUEST_TIMEOUT` (5s) | Upload se odbija (`503`). Neuspelo oslobađanje se ponavlja (saga, 5.6). | planirano |
+| S4 | Sharing → Users | `POST /internal/users/lookup` `{email}` → `{id, active}` | Deljenje sa korisnikom zadatim mejlom | Bez ID-ja primaoca deljenje ne može da se upiše. | `SHARING_REQUEST_TIMEOUT` (5s) | Deljenje se odbija (`503`). | planirano |
+| S5 | Analytics → Files | `GET /internal/files/{id}/owner` → `{ownerId}` | Statistika preuzimanja jedne datoteke (A4) | Samo vlasnik sme da vidi statistiku; Analytics ne zna vlasnika. | `ANALYTICS_REQUEST_TIMEOUT` (5s) | Zahtev se odbija (`503`). | planirano |
+
+Napomene:
+- S4 šalje mejl u **telu** `POST` zahteva, ne u URL-u, jer URL-ovi završavaju u
+  logovima.
+- Primalac deljenja dobija rezultat `active: false` isto kao nepostojeći
+  korisnik: Sharing odgovara opštom porukom, pa se deljenjem ne može proveriti
+  da li neki mejl ima nalog.
+- Za otpremanje u tuđi folder (pravo `WRITE`) troši se kvota **vlasnika
+  foldera**, pa S3 rezerviše prostor za `ownerId` foldera, ne za onog ko
+  otprema.
+- *Predlog za IB (SC):* interne rute dodatno štititi zajedničkim tajnim
+  headerom (`X-Internal-Token` iz env-a) ili mTLS-om, a u K8s-u NetworkPolicy
+  koja dozvoljava samo pozive iz tabele.
+
+### 5.5 Asinhrona komunikacija (događaji)
+
+Format događaja i katalog su u sekcijama 4.1 i 4.2. Ovde je ista slika
+gledana iz ugla potrošača: šta svaki servis radi kada primi događaj.
+
+| Potrošač | Događaj | Reakcija |
+|---|---|---|
+| Files | `user.deleted` | Briše sve foldere, datoteke i MinIO objekte korisnika. |
+| Sharing | `folder.created`, `file.uploaded` | `MERGE` čvor + `CONTAINS` od roditelja (2.6). |
+| Sharing | `folder.renamed`, `file.renamed` | Ažurira `name`. |
+| Sharing | `folder.moved`, `file.moved` | Premešta `CONTAINS` vezu. |
+| Sharing | `folder.deleted`, `file.deleted` | Briše podgraf i sva deljenja nad njim. |
+| Sharing | `user.deleted` | Briše čvor korisnika, njegove resurse i deljenja. |
+| Notifications | `share.granted`, `share.revoked` | Obaveštenje primaocu (`SHARE_GRANTED` / `SHARE_REVOKED`). |
+| Notifications | `quota.threshold_reached` | Obaveštenje vlasniku (`QUOTA_WARNING`). |
+| Notifications | `file.uploaded` | Ako je otpremio neko drugi u folder vlasnika: `SHARED_FOLDER_UPLOAD` vlasniku. |
+| Notifications | `user.deleted` | Briše particije korisnika. |
+| Analytics | `user.activated`, `user.logged_in`, `file.uploaded`, `file.downloaded`, `share.granted` | Upis u `events_by_user` i uvećanje brojača (4.3). |
+| Analytics | `folder.created`, `folder.deleted`, `file.deleted`, `share.revoked` | Upis u `events_by_user`; `file.deleted` briše i `downloads_by_file`. |
+| Analytics | `user.deleted` | Briše statistiku i aktivnost korisnika. |
+
+Svaki događaj iz kataloga 4.2 ima bar jednog potrošača, a svaki potrošač
+reaguje samo na događaje iz kataloga.
+
+**Garancije i pravila:**
+- **Isporuka barem jednom.** Potrošač potvrđuje događaj brokeru tek posle
+  uspešne obrade, a duplikate prepoznaje po `eventId` (4.4). Sharing je
+  idempotentan po prirodi upita (`MERGE`, `SET`).
+- **Redosled po vlasniku.** Događaji istog izvora za istog `ownerId` moraju
+  stizati redom (npr. `folder.created` pre `folder.moved`). Na brokeru se to
+  postiže particionisanjem ili rutiranjem po `ownerId`.
+- **Teme po izvoru:** `users.events`, `files.events`, `sharing.events`. Potrošač
+  se pretplaćuje na teme izvora koje sluša i odbacuje tipove koji ga ne
+  zanimaju. Izbor konkretnog brokera je deo Files dela (SB).
+- **Neuspela obrada.** Posle nekoliko ponovljenih pokušaja događaj ide u
+  „dead letter“ red i loguje se (`eventId`, `type`, greška, bez `payload`-a).
+- *Predlog (SB, SC):* **transakcioni outbox**. Emiter upisuje događaj u
+  kolekciju `outbox` u istoj operaciji kao i promenu podataka, a poseban
+  proces ga šalje brokeru. Bez toga pad servisa između upisa u bazu i slanja
+  događaja gubi događaj (npr. graf ne sazna za novu datoteku).
+
+### 5.6 Ključni tokovi
+
+#### Registracija, potvrda i prijava (implementirano)
+
+```mermaid
+sequenceDiagram
+    actor K as Klijent
+    participant GW as Gateway
+    participant U as Users
+    participant F as Files
+    participant M as Mejl server
+    participant B as Broker
+
+    K->>GW: POST /api/auth/register
+    GW->>U: POST /register
+    U->>U: upis korisnika (active=false), heš tokena
+    U->>M: mejl sa linkom za potvrdu
+    Note over U,M: ako slanje ne uspe, nalog se briše (kompenzacija)
+    U-->>K: 201
+
+    K->>GW: POST /api/auth/confirm {token}
+    GW->>U: POST /confirm
+    U->>U: FindOneAndDelete tokena
+    U->>F: S1 POST /internal/folders/root
+    F-->>U: 201 (ili 200 ako koren već postoji)
+    Note over U,F: ako S1 ne uspe, token se vraća i korisnik pokušava ponovo
+    U->>U: active=true
+    U-)B: user.activated
+    U-->>K: 200
+
+    K->>GW: POST /api/auth/login {email, lozinka}
+    GW->>U: POST /login
+    U->>M: OTP mejlom
+    K->>GW: POST /api/auth/login/verify {email, otp}
+    GW->>U: POST /login/verify
+    U-)B: user.logged_in
+    U-->>K: 200 {JWT}
+```
+
+#### Otpremanje datoteke (saga, planirano)
+
+```mermaid
+sequenceDiagram
+    actor K as Klijent
+    participant GW as Gateway
+    participant F as Files
+    participant S as Sharing
+    participant U as Users
+    participant O as MinIO
+    participant B as Broker
+    participant A as Analytics
+
+    K->>GW: POST /api/folders/{id}/files (JWT)
+    GW->>F: X-User-ID
+    opt folder nije korisnikov
+        F->>S: S2 GET /internal/access
+        S-->>F: permission (mora WRITE)
+    end
+    F->>U: S3 quota/reserve {bytes} (za vlasnika foldera)
+    U-->>F: OK ili 409 (nema mesta)
+    U-)B: quota.threshold_reached (ako je prešao prag)
+    F->>O: PUT objekat (objectKey)
+    alt upis u MinIO ili MongoDB ne uspe
+        F->>O: DELETE objekat (ako je upisan)
+        F->>U: S3 quota/release {bytes}
+        F-->>K: greška
+    else uspeh
+        F->>F: upis metapodataka u files
+        F-)B: file.uploaded
+        F-->>K: 201
+    end
+    B-)S: file.uploaded → čvor + CONTAINS
+    B-)A: file.uploaded → statistika
+```
+
+(Notifications takođe prima `file.uploaded` kada je otpremio neko drugi;
+izostavljeno radi preglednosti.)
+
+#### Deljenje foldera i obaveštenje (planirano)
+
+```mermaid
+sequenceDiagram
+    actor V as Vlasnik
+    actor P as Primalac
+    participant GW as Gateway
+    participant S as Sharing
+    participant U as Users
+    participant B as Broker
+    participant N as Notifications
+    participant A as Analytics
+
+    V->>GW: POST /api/shares {resourceId, email, permission}
+    GW->>S: X-User-ID = vlasnik
+    S->>U: S4 POST /internal/users/lookup {email}
+    U-->>S: {id, active}
+    S->>S: MERGE HAS_ACCESS (samo ako je X-User-ID vlasnik)
+    S-)B: share.granted
+    S-->>V: 201
+    B-)N: share.granted → SHARE_GRANTED za primaoca
+    B-)A: share.granted → shares_granted + 1
+    P->>GW: GET /api/notifications/unread-count
+    GW->>N: X-User-ID = primalac
+    N-->>P: {count: 1}
+```
+
+### 5.7 Usklađenost sa arhitekturom
+
+- Svaki servis ima samo svoju bazu (4.5); podaci drugog servisa dobijaju se
+  isključivo preko S1–S5 ili događaja.
+- Svaki sinhroni poziv ima timeout i definisano ponašanje pri padu (5.4).
+- Svaki događaj iz 4.2 ima potrošača (5.5), a nijedan ne nosi lozinke,
+  tokene, OTP, mejl ni sadržaj datoteke.
+- Klijent priča samo sa gateway-om; `/internal/*` rute nisu izložene (5.3).
+- Notifications i Analytics nemaju sinhronih poziva ka sebi od drugih servisa
+  osim preko gateway-a, pa njihov pad ne utiče na rad sa datotekama.
