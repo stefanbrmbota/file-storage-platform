@@ -5,7 +5,7 @@ Dokument opisuje arhitekturu platforme (US-29). Popunjava se po podtaskovima:
 | Task | Sekcija | Stanje |
 |---|---|---|
 | T-29.1 | [Model podataka – Users i Files](#1-model-podataka--users-i-files) | gotovo |
-| — | Model podataka – Sharing, Notifications, Analytics | sledi |
+| T-29.2 | [Model podataka – Sharing](#2-model-podataka--sharing-neo4j), [Notifications](#3-model-podataka--notifications-cassandra), [Analytics i događaji](#4-model-podataka--analytics-cassandra-i-događaji) | gotovo |
 | — | Mapa komunikacije (sinhroni/asinhroni pozivi, endpointi, događaji) | sledi |
 
 ---
@@ -210,3 +210,482 @@ SC za Users), uz story kome pripadaju:
 | `users` | korišćenje `passwordChangedAt` pri validaciji JWT-a | Posle promene lozinke stari tokeni prestaju da važe. |
 | `otps` | limit na `attempts` (npr. 5), posle čega se OTP briše | Sprečava pogađanje 6-cifrenog koda u roku važenja. |
 | `files` | popunjavanje i provera `hash` | Otkrivanje oštećenog ili podmetnutog sadržaja u object store-u. |
+
+---
+
+> **Napomena za sekcije 2–4:** servisi Sharing, Notifications i Analytics još
+> nemaju kod, pa je ovo **projektovani** model, ne opis postojećeg stanja.
+> Upiti koje model podržava izvedeni su iz opisa platforme; tamo gde je nešto
+> pretpostavka, piše *Pretpostavka*. Kada se story-ji za ove servise
+> implementiraju, model se usklađuje sa njihovim kriterijumima prihvatanja.
+
+## 2. Model podataka – Sharing (Neo4j)
+
+Sharing servis čuva **ko ima pristup čemu**. Deljenje je prirodno graf: folder
+podeljen sa korisnikom važi i za sve što je u njemu, na bilo kojoj dubini, a to
+je u grafu jedan upit po putanji umesto rekurzije kroz kolekcije.
+
+Graf ne kopira metapodatke datoteka: izvor istine za imena, veličine i stablo
+foldera je Files servis. Sharing drži samo ID-jeve, vlasnika, ime (zbog liste
+„podeljeno sa mnom“) i strukturu stabla, i ažurira ih na osnovu događaja iz
+Files servisa (sekcija 4.2).
+
+### 2.1 Čvorovi
+
+| Label | Svojstva | Opis |
+|---|---|---|
+| `:User` | `id: String` | Korisnik; `id` = `users._id`. Ne čuva se mejl ni ime (nije potrebno za proveru prava). |
+| `:Resource:Folder` | `id: String`, `ownerId: String`, `name: String` | Folder; `id` = `folders._id`. |
+| `:Resource:File` | `id: String`, `ownerId: String`, `name: String` | Datoteka; `id` = `files._id`. |
+
+Folder i datoteka dele label `:Resource`, pa jedno ograničenje jedinstvenosti i
+jedan upit za proveru prava važe za oba tipa.
+
+### 2.2 Veze
+
+| Veza | Svojstva | Opis |
+|---|---|---|
+| `(:Folder)-[:CONTAINS]->(:Folder)` / `(:Folder)-[:CONTAINS]->(:File)` | — | Stablo foldera, isto kao `parentId` u Files servisu. Svaki resurs osim korena ima tačno jednu ulaznu `CONTAINS` vezu. |
+| `(:User)-[:HAS_ACCESS]->(:Resource)` | `permission: String` (`READ` \| `WRITE`), `grantedBy: String` (ID vlasnika), `grantedAt: DateTime` | Vlasnik je podelio resurs sa korisnikom. Najviše jedna veza po paru korisnik–resurs. |
+
+Vlasništvo se ne modeluje vezom nego svojstvom `ownerId`: vlasnik uvek ima sva
+prava, pa za njega nije potreban upit kroz graf.
+
+```
+ (:User {id:"ana"})                     (:User {id:"marko"})
+                                              │
+                                              │ HAS_ACCESS {permission:"READ"}
+                                              ▼
+ (:Folder {id:"root", ownerId:"ana"}) ─CONTAINS─► (:Folder {id:"f1", name:"Fakultet"})
+                                                        │
+                                                        ├─CONTAINS─► (:File {id:"x", name:"cv.pdf"})
+                                                        └─CONTAINS─► (:Folder {id:"f2"}) ─CONTAINS─► (:File {id:"y"})
+
+ Marko može da čita f1, x, f2 i y (nasleđeno preko CONTAINS).
+```
+
+### 2.3 Pravila pristupa
+
+- Vlasnik (`ownerId`) ima puno pravo nad svojim resursima.
+- Korisnik ima pravo nad resursom ako postoji `HAS_ACCESS` ka tom resursu
+  **ili ka bilo kom folderu iznad njega**.
+- Ako postoji više takvih veza (npr. `READ` na folderu i `WRITE` na podfolderu),
+  važi **najjače** pravo: `WRITE` > `READ`.
+- `WRITE` dozvoljava otpremanje, preimenovanje i brisanje unutar podeljenog
+  foldera; `READ` samo pregled i preuzimanje. *Pretpostavka*: precizan skup
+  operacija po pravu definiše story za deljenje.
+- Deliti može samo vlasnik. *Pretpostavka*: korisnik sa `WRITE` ne može dalje
+  deliti tuđi resurs.
+
+### 2.4 Ograničenja i indeksi
+
+```cypher
+CREATE CONSTRAINT user_id_unique IF NOT EXISTS
+FOR (u:User) REQUIRE u.id IS UNIQUE;
+
+CREATE CONSTRAINT resource_id_unique IF NOT EXISTS
+FOR (r:Resource) REQUIRE r.id IS UNIQUE;
+
+CREATE INDEX resource_owner IF NOT EXISTS
+FOR (r:Resource) ON (r.ownerId);
+```
+
+Ograničenja jedinstvenosti automatski prave indeks po `id`, pa svaki upit
+počinje brzim pronalaženjem čvora. Indeks po `ownerId` služi za brisanje svih
+resursa korisnika kada se nalog obriše. Jedinstvenost `HAS_ACCESS` po paru
+obezbeđuje se tako što se veza uvek pravi sa `MERGE`, nikad sa `CREATE`.
+
+### 2.5 Upiti
+
+Svi upiti koriste parametre (`$userId`, ...), nikad spajanje stringova
+(zaštita od Cypher injekcije).
+
+**Podeli resurs** (ili promeni pravo postojećem deljenju):
+```cypher
+MATCH (r:Resource {id: $resourceId, ownerId: $ownerId})
+MERGE (u:User {id: $granteeId})
+MERGE (u)-[a:HAS_ACCESS]->(r)
+SET a.permission = $permission, a.grantedBy = $ownerId, a.grantedAt = datetime()
+```
+Filter `ownerId: $ownerId` znači da korisnik ne može da deli tuđ resurs: ako nije
+vlasnik, `MATCH` ne nađe ništa i ništa se ne upisuje.
+
+**Ukini deljenje:**
+```cypher
+MATCH (:User {id: $granteeId})-[a:HAS_ACCESS]->(:Resource {id: $resourceId, ownerId: $ownerId})
+DELETE a
+```
+
+**Provera prava** (Files servis pita pre preuzimanja ili izmene tuđeg resursa):
+```cypher
+MATCH (r:Resource {id: $resourceId})
+OPTIONAL MATCH (anc:Resource)-[:CONTAINS*0..]->(r)
+OPTIONAL MATCH (:User {id: $userId})-[a:HAS_ACCESS]->(anc)
+WITH r, collect(a.permission) AS perms
+RETURN r.ownerId = $userId AS isOwner,
+       CASE WHEN 'WRITE' IN perms THEN 'WRITE'
+            WHEN 'READ'  IN perms THEN 'READ'
+            ELSE null END AS permission
+```
+`*0..` uključuje i sam resurs (dužina 0) i sve njegove pretke. Pošto svaki
+čvor ima najviše jednog roditelja, putanja ka korenu je jedna i upit je
+linearan po dubini stabla.
+
+**Podeljeno sa mnom** (samo direktno podeljeni resursi; sadržaj podeljenog
+foldera klijent otvara kroz Files servis, uz proveru prava):
+```cypher
+MATCH (:User {id: $userId})-[a:HAS_ACCESS]->(r:Resource)
+RETURN r.id, r.name, r.ownerId, labels(r) AS type, a.permission, a.grantedAt
+ORDER BY a.grantedAt DESC
+```
+
+**S kim je resurs podeljen** (vlasnikov pregled, uključujući nasleđena prava):
+```cypher
+MATCH (r:Resource {id: $resourceId, ownerId: $ownerId})
+MATCH (anc:Resource)-[:CONTAINS*0..]->(r)
+MATCH (u:User)-[a:HAS_ACCESS]->(anc)
+RETURN u.id, a.permission, anc.id AS viaResourceId
+```
+
+### 2.6 Sinhronizacija sa Files servisom
+
+| Događaj (sekcija 4.2) | Promena u grafu |
+|---|---|
+| `folder.created`, `file.uploaded` | `MERGE` čvor sa `id`, `ownerId`, `name` + `CONTAINS` od roditelja (osim za koren). |
+| `folder.renamed`, `file.renamed` | `SET r.name = $name`. |
+| `folder.moved`, `file.moved` | Briše se stara ulazna `CONTAINS` veza i pravi nova od novog roditelja. Proveru da folder ne ide u sopstvenog potomka radi Files servis pre emitovanja događaja. |
+| `folder.deleted`, `file.deleted` | `MATCH (r:Resource {id:$id})-[:CONTAINS*0..]->(d) DETACH DELETE d`: briše resurs, ceo podgraf i sva deljenja nad njima. |
+| `user.deleted` | `DETACH DELETE` čvora korisnika (njegova primljena deljenja) i svih resursa sa `ownerId = $userId`. |
+
+Svi upisi su idempotentni (`MERGE`, `SET`, brisanje nepostojećeg ne pravi
+grešku), pa ponovljen događaj ne kvari graf.
+
+---
+
+## 3. Model podataka – Notifications (Cassandra)
+
+Notifications servis čuva obaveštenja za korisnika u aplikaciji: „Marko je
+podelio folder Fakultet sa tobom“, „Iskoristio si 90% prostora“ i slično.
+Obaveštenja nastaju iz događaja (sekcija 4); servis ih ne pravi na zahtev
+klijenta.
+
+U Cassandri se **tabela projektuje prema upitu**: svaki upit čita tačno jednu
+particiju, bez `ALLOW FILTERING` i bez sekundarnih indeksa.
+
+### 3.1 Upiti
+
+| # | Upit | Tabela |
+|---|---|---|
+| N1 | Lista obaveštenja korisnika, najnovija prva, sa stranicama | `notifications_by_user` |
+| N2 | Broj nepročitanih (bedž u klijentu) | `unread_by_user` |
+| N3 | Označi jedno obaveštenje kao pročitano | obe |
+| N4 | Označi sva kao pročitana | obe |
+
+### 3.2 Keyspace
+
+```sql
+CREATE KEYSPACE IF NOT EXISTS notifications
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+```
+Za lokalni razvoj je `replication_factor: 1`; u K8s okruženju
+`NetworkTopologyStrategy` sa faktorom 3. Ime keyspace-a i faktor dolaze iz env
+promenljivih (`NOTIFICATIONS_CASSANDRA_KEYSPACE`, ...), kao i adrese čvorova.
+
+### 3.3 Tabela `notifications_by_user`
+
+```sql
+CREATE TABLE IF NOT EXISTS notifications_by_user (
+    user_id         text,
+    notification_id timeuuid,
+    type            text,
+    message         text,
+    actor_id        text,
+    resource_id     text,
+    resource_type   text,
+    is_read         boolean,
+    PRIMARY KEY ((user_id), notification_id)
+) WITH CLUSTERING ORDER BY (notification_id DESC)
+  AND default_time_to_live = 7776000;   -- 90 dana
+```
+
+| Kolona | Tip | Uloga | Opis |
+|---|---|---|---|
+| `user_id` | text | particioni ključ | Primalac (`users._id`). Sva obaveštenja jednog korisnika su u jednoj particiji. |
+| `notification_id` | timeuuid | clustering, `DESC` | Jedinstven ID koji nosi i vreme nastanka (`toTimestamp(notification_id)`), pa nema posebne kolone `created_at` i sortiranje „najnovije prvo“ je besplatno. |
+| `type` | text | — | `SHARE_GRANTED`, `SHARE_REVOKED`, `QUOTA_WARNING`, `SHARED_FOLDER_UPLOAD` (vidi 3.5). |
+| `message` | text | — | Tekst za prikaz, sastavljen pri nastanku. |
+| `actor_id` | text | — | Ko je izazvao obaveštenje (npr. vlasnik koji je delio); prazno za sistemska. |
+| `resource_id`, `resource_type` | text | — | Na šta se odnosi (`FOLDER` / `FILE`), da klijent može da otvori resurs. |
+| `is_read` | boolean | — | Da li je pročitano. |
+
+TTL od 90 dana ograničava veličinu particije: stara obaveštenja se sama brišu,
+pa particija aktivnog korisnika ne raste neograničeno.
+
+Upit N1 (stranice preko `paging state`-a drajvera):
+```sql
+SELECT * FROM notifications_by_user WHERE user_id = ? LIMIT 20;
+```
+
+### 3.4 Tabela `unread_by_user`
+
+```sql
+CREATE TABLE IF NOT EXISTS unread_by_user (
+    user_id         text,
+    notification_id timeuuid,
+    PRIMARY KEY ((user_id), notification_id)
+) WITH default_time_to_live = 7776000;
+```
+
+Red postoji dok je obaveštenje nepročitano. Broj nepročitanih (N2) je brojanje
+u jednoj particiji:
+```sql
+SELECT COUNT(*) FROM unread_by_user WHERE user_id = ?;
+```
+
+**Zašto ne `counter` kolona:** Cassandra brojač nije idempotentan (ponovljen
+`+1` posle timeouta broji dvaput), ne može imati TTL (istekla obaveštenja ne bi
+umanjila broj) i ne može se kombinovati sa običnim kolonama. Posebna tabela sa
+istim TTL-om uvek daje tačan broj, a particija je mala jer sadrži samo
+nepročitana.
+
+### 3.5 Upisi i održavanje
+
+**Novo obaveštenje** (iz događaja): oba upisa idu u jedan `BATCH` (logged), pa
+ili postoje u obe tabele ili ni u jednoj:
+```sql
+BEGIN BATCH
+  INSERT INTO notifications_by_user (user_id, notification_id, type, message, actor_id, resource_id, resource_type, is_read)
+  VALUES (?, ?, ?, ?, ?, ?, ?, false);
+  INSERT INTO unread_by_user (user_id, notification_id) VALUES (?, ?);
+APPLY BATCH;
+```
+Batch je ovde u redu jer su obe particije istog korisnika i mali.
+
+**Označi kao pročitano** (N3):
+```sql
+UPDATE notifications_by_user USING TTL ? SET is_read = true
+WHERE user_id = ? AND notification_id = ?;
+DELETE FROM unread_by_user WHERE user_id = ? AND notification_id = ?;
+```
+`USING TTL ?` je **preostali** TTL reda (pročitan sa `SELECT TTL(message) ...`).
+Bez toga bi `UPDATE` dao koloni `is_read` novih 90 dana, pa bi posle isteka
+ostalih kolona ostao „prazan“ red sa samo `is_read`.
+
+**Označi sva kao pročitana** (N4): pročitaju se ID-jevi iz `unread_by_user` za
+korisnika, za svaki se radi `UPDATE` kao gore, a zatim se cela particija briše
+jednim `DELETE FROM unread_by_user WHERE user_id = ?`.
+
+**Brisanje naloga** (`user.deleted`): `DELETE` cele particije u obe tabele.
+
+Tipovi obaveštenja i događaji iz kojih nastaju (*Pretpostavka*: konačan spisak
+definiše story za obaveštenja):
+
+| `type` | Događaj | Primalac |
+|---|---|---|
+| `SHARE_GRANTED` | `share.granted` | korisnik sa kojim je podeljeno |
+| `SHARE_REVOKED` | `share.revoked` | korisnik kome je ukinut pristup |
+| `QUOTA_WARNING` | `quota.threshold_reached` | vlasnik naloga |
+| `SHARED_FOLDER_UPLOAD` | `file.uploaded` u folderu koji je podeljen | vlasnik foldera, ako je otpremio neko drugi |
+
+Idempotentnost obrade događaja (isti događaj ne sme da napravi dva
+obaveštenja) rešava se tabelom `processed_events` (sekcija 4.4).
+
+---
+
+## 4. Model podataka – Analytics (Cassandra) i događaji
+
+Analytics servis ne prima pozive za upis: samo **sluša događaje** sa brokera i
+iz njih gradi statistiku. Isti događaji pokreću i Sharing (sinhronizacija
+grafa) i Notifications, pa je njihova struktura zajednička za ceo sistem i
+opisana je ovde.
+
+**Zašto Cassandra:** događaji se samo dodaju, ima ih mnogo, ne menjaju se i
+čitaju se po poznatom ključu i vremenu (aktivnost korisnika za period, statistika
+po danu). To je slučaj za koji je Cassandra napravljena. Cena je da svaki
+prikaz u klijentu mora imati unapred svoju tabelu; proizvoljni upiti nisu
+podržani. Isti klaster koristi i Notifications, u posebnom keyspace-u.
+
+### 4.1 Format događaja
+
+Svaki događaj na brokeru je JSON sa istim omotačem:
+
+```json
+{
+  "eventId":    "7f1c9b2e-3a4d-4e8f-9c1b-2d3e4f5a6b7c",
+  "type":       "file.uploaded",
+  "version":    1,
+  "occurredAt": "2026-11-18T16:47:08.511Z",
+  "source":     "files",
+  "actorId":    "a3f9c2...",
+  "payload":    { "fileId": "…", "ownerId": "…", "parentId": "…", "name": "cv.pdf", "size": 182044, "contentType": "application/pdf" }
+}
+```
+
+| Polje | Tip | Opis |
+|---|---|---|
+| `eventId` | UUID v4 | Jedinstven ID događaja. Potrošači ga koriste za idempotentnu obradu (4.4). |
+| `type` | string | `<entitet>.<radnja>` u prošlom vremenu, mala slova. |
+| `version` | int | Verzija šeme `payload`-a; menja se pri nekompatibilnoj izmeni, pa potrošač zna kako da ga pročita. |
+| `occurredAt` | RFC 3339, UTC | Kada se radnja desila (ne kada je događaj obrađen). |
+| `source` | string | Servis koji je emitovao događaj (`users`, `files`, `sharing`). |
+| `actorId` | string | `users._id` korisnika koji je izvršio radnju; prazno za sistemske radnje. |
+| `payload` | objekat | Podaci specifični za tip (4.2). |
+
+Isporuka sa brokera je **barem jednom** (at-least-once): događaj može stići
+više puta, pa svaki potrošač mora biti idempotentan. Izbor brokera i imena
+tema su deo Files dela (SB) i mape komunikacije.
+
+### 4.2 Katalog događaja
+
+| `type` | Izvor | Potrošači | `payload` |
+|---|---|---|---|
+| `user.activated` | users | analytics | `userId` |
+| `user.logged_in` | users | analytics | `userId` |
+| `user.deleted` | users | files, sharing, notifications, analytics | `userId` |
+| `quota.threshold_reached` | users | notifications | `userId`, `usedBytes`, `quotaBytes`, `percent` |
+| `folder.created` | files | sharing, analytics | `folderId`, `ownerId`, `parentId`, `name` |
+| `folder.renamed` | files | sharing | `folderId`, `name` |
+| `folder.moved` | files | sharing | `folderId`, `oldParentId`, `newParentId` |
+| `folder.deleted` | files | sharing, analytics | `folderId`, `ownerId` |
+| `file.uploaded` | files | sharing, notifications, analytics | `fileId`, `ownerId`, `parentId`, `name`, `size`, `contentType` |
+| `file.downloaded` | files | analytics | `fileId`, `ownerId` |
+| `file.renamed` | files | sharing | `fileId`, `name` |
+| `file.moved` | files | sharing | `fileId`, `oldParentId`, `newParentId` |
+| `file.deleted` | files | sharing, analytics | `fileId`, `ownerId`, `size` |
+| `share.granted` | sharing | notifications, analytics | `resourceId`, `resourceType`, `resourceName`, `ownerId`, `granteeId`, `permission` |
+| `share.revoked` | sharing | notifications, analytics | `resourceId`, `resourceType`, `ownerId`, `granteeId` |
+
+**Šta nikad ne ide u događaj (IB):** lozinke i heševi lozinki, tokeni, OTP
+kodovi, JWT, sadržaj datoteka, `objectKey` i mejl adrese. Korisnik se
+identifikuje samo ID-jem. Servisi u logove upisuju `eventId` i `type`, ne ceo
+`payload`.
+
+### 4.3 Upiti i tabele Analytics servisa
+
+| # | Upit | Tabela |
+|---|---|---|
+| A1 | Aktivnost korisnika (lista događaja) za izabrani mesec, najnovije prvo | `events_by_user` |
+| A2 | Dnevna statistika korisnika (otpremanja, preuzimanja, bajtovi, deljenja) za period | `daily_stats_by_user` |
+| A3 | Dnevna statistika cele platforme za admina (registracije, prijave, otpremanja, preuzimanja, bajtovi) | `daily_stats_global` |
+| A4 | Broj preuzimanja jedne datoteke po danima (vlasnikov pregled) | `downloads_by_file` |
+
+*Pretpostavka*: konačan spisak prikaza definiše story za analitiku; nova
+metrika znači novu tabelu ili novu kolonu brojača.
+
+```sql
+CREATE KEYSPACE IF NOT EXISTS analytics
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+```
+
+**`events_by_user`** (A1):
+```sql
+CREATE TABLE IF NOT EXISTS events_by_user (
+    user_id     text,
+    month       text,        -- 'YYYY-MM'
+    occurred_at timestamp,
+    event_id    uuid,
+    type        text,
+    resource_id text,
+    payload     text,        -- JSON iz događaja
+    PRIMARY KEY ((user_id, month), occurred_at, event_id)
+) WITH CLUSTERING ORDER BY (occurred_at DESC, event_id ASC)
+  AND default_time_to_live = 15552000;   -- 180 dana
+```
+Particija je **korisnik + mesec** (bucketing), pa ni vrlo aktivan korisnik ne
+pravi preveliku particiju. `event_id` u ključu razlikuje dva događaja u istoj
+milisekundi i čini upis idempotentnim: isti događaj upisan dvaput je isti red.
+
+```sql
+SELECT * FROM events_by_user WHERE user_id = ? AND month = ? LIMIT 50;
+```
+
+**`daily_stats_by_user`** (A2):
+```sql
+CREATE TABLE IF NOT EXISTS daily_stats_by_user (
+    user_id        text,
+    day            date,
+    uploads        counter,
+    downloads      counter,
+    bytes_uploaded counter,
+    shares_granted counter,
+    PRIMARY KEY ((user_id), day)
+) WITH CLUSTERING ORDER BY (day DESC);
+```
+```sql
+UPDATE daily_stats_by_user SET uploads = uploads + 1, bytes_uploaded = bytes_uploaded + ?
+WHERE user_id = ? AND day = ?;
+
+SELECT * FROM daily_stats_by_user WHERE user_id = ? AND day >= ? AND day <= ?;
+```
+
+**`daily_stats_global`** (A3):
+```sql
+CREATE TABLE IF NOT EXISTS daily_stats_global (
+    year           int,
+    day            date,
+    registrations  counter,
+    logins         counter,
+    uploads        counter,
+    downloads      counter,
+    bytes_uploaded counter,
+    PRIMARY KEY ((year), day)
+) WITH CLUSTERING ORDER BY (day DESC);
+```
+Particija po godini ima najviše 366 redova, a admin pregled „poslednjih 30
+dana“ čita jednu particiju (ili dve na prelazu godine).
+
+**`downloads_by_file`** (A4):
+```sql
+CREATE TABLE IF NOT EXISTS downloads_by_file (
+    file_id   text,
+    day       date,
+    downloads counter,
+    PRIMARY KEY ((file_id), day)
+) WITH CLUSTERING ORDER BY (day DESC);
+```
+Analytics ne proverava vlasništvo: upit A4 dozvoljava se samo vlasniku, a to
+proverava gateway ili Files servis pre poziva.
+
+Kod `file.deleted` briše se particija datoteke u `downloads_by_file`. Kod
+`user.deleted` briše se particija korisnika u `daily_stats_by_user`, a u
+`events_by_user` njegove particije za poslednjih 7 meseci (stariji meseci su
+već istekli kroz TTL od 180 dana). Brisanje naloga mora obrisati i istoriju
+aktivnosti.
+
+Mapiranje događaja na brojače: `user.activated` → `registrations`,
+`user.logged_in` → `logins`, `file.uploaded` → `uploads` i `bytes_uploaded`,
+`file.downloaded` → `downloads` (i `downloads_by_file`), `share.granted` →
+`shares_granted`.
+
+### 4.4 Idempotentna obrada događaja
+
+Isti obrazac koriste Notifications i Analytics, svaki u svom keyspace-u:
+
+```sql
+CREATE TABLE IF NOT EXISTS processed_events (
+    event_id uuid PRIMARY KEY
+) WITH default_time_to_live = 604800;   -- 7 dana
+```
+
+Obrada jednog događaja:
+1. `INSERT INTO processed_events (event_id) VALUES (?) IF NOT EXISTS;`
+   (lightweight transakcija).
+2. Ako je `[applied] = false`, događaj je već obrađen: potvrdi ga brokeru i
+   preskoči.
+3. Inače upiši obaveštenje ili uvećaj brojače, pa potvrdi događaj brokeru.
+
+Upisi u `events_by_user` su idempotentni sami po sebi, ali brojači (`counter`)
+nisu, pa im je ova provera neophodna. Ako servis padne između koraka 1 i 3,
+događaj se pri ponovnoj isporuci preskače i jedan `+1` se gubi. To je
+prihvatljivo za statistiku i bolje od dvostrukog brojanja. TTL od 7 dana je
+duži od bilo kog realnog ponavljanja isporuke.
+
+### 4.5 Pregled skladišta po servisima
+
+| Servis | Baza | Keyspace / baza | Tabele / kolekcije |
+|---|---|---|---|
+| Users | MongoDB | `users` | `users`, `confirmation_tokens`, `otps` |
+| Files | MongoDB + MinIO | `files` | `folders`, `files` + bucket sa sadržajem |
+| Sharing | Neo4j | — | `:User`, `:Resource:Folder`, `:Resource:File`, `CONTAINS`, `HAS_ACCESS` |
+| Notifications | Cassandra | `notifications` | `notifications_by_user`, `unread_by_user`, `processed_events` |
+| Analytics | Cassandra | `analytics` | `events_by_user`, `daily_stats_by_user`, `daily_stats_global`, `downloads_by_file`, `processed_events` |
