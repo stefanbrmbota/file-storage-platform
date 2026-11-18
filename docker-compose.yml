@@ -1,0 +1,221 @@
+# Lokalno radno okruženje (US-33, T-33.2): gateway, svi servisi i njihove baze.
+#
+#   docker compose up --build -d     podiže sve
+#   docker compose ps                stanje i healthcheck
+#   docker compose logs -f users     logovi jednog servisa
+#   docker compose down              gasi (podaci ostaju u volume-ima)
+#   docker compose down -v           gasi i briše podatke
+#
+# Pravila (docs/design.md, odeljak 5):
+# - Spolja je dostupan SAMO gateway (port 8080). Servisi i baze su u internoj
+#   mreži "backend" (internal: true) i nemaju objavljene portove.
+# - Servisi se međusobno zovu po imenu iz ovog fajla (http://users:8081, mongo:27017...).
+# - Konfiguracija: <servis>/.env.example (obavezno) pa <servis>/.env (opciono,
+#   lokalne izmene); "environment:" ovde prepisuje samo adrese za Docker mrežu.
+# - Tajne zajedničke za više kontejnera (JWT, MinIO, Neo4j) dolaze iz root .env
+#   (šablon: .env.example u root-u); podrazumevane vrednosti su samo za lokalni razvoj.
+
+name: file-storage-platform
+
+x-go-service: &go-service
+  restart: unless-stopped
+  networks: [backend]
+
+services:
+  # ---- ulazna tačka --------------------------------------------------------
+  gateway:
+    <<: *go-service
+    build: { context: ., dockerfile: api-gateway/Dockerfile }
+    env_file:
+      - path: api-gateway/.env.example
+      - path: api-gateway/.env
+        required: false
+    environment:
+      GATEWAY_PORT: "8080"
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-at-least-32-chars}
+      USERS_SERVICE_URL: http://users:8081
+      FILES_SERVICE_URL: http://files:8082
+      NOTIFICATIONS_SERVICE_URL: http://notifications:8083
+      SHARING_SERVICE_URL: http://sharing:8084
+      ANALYTICS_SERVICE_URL: http://analytics:8085
+    ports:
+      - "${GATEWAY_PUBLIC_PORT:-8080}:8080"
+    networks: [backend, public]
+    depends_on:
+      users: { condition: service_started }
+      files: { condition: service_started }
+      notifications: { condition: service_started }
+      sharing: { condition: service_started }
+      analytics: { condition: service_started }
+
+  # ---- servisi -------------------------------------------------------------
+  users:
+    <<: *go-service
+    build: { context: ., dockerfile: services/users/Dockerfile }
+    env_file:
+      - path: services/users/.env.example
+      - path: services/users/.env
+        required: false
+    environment:
+      USERS_PORT: "8081"
+      USERS_MONGO_URI: mongodb://mongo:27017
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      FILES_SERVICE_URL: http://files:8082
+      JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-at-least-32-chars}
+    expose: ["8081"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      mailhog: { condition: service_started }
+
+  files:
+    <<: *go-service
+    build: { context: ., dockerfile: services/files/Dockerfile }
+    env_file:
+      - path: services/files/.env.example
+      - path: services/files/.env
+        required: false
+    environment:
+      FILES_PORT: "8082"
+      FILES_MONGO_URI: mongodb://mongo:27017
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-change-me}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio}
+      USERS_SERVICE_URL: http://users:8081
+    expose: ["8082"]
+    depends_on:
+      mongo: { condition: service_healthy }
+      minio: { condition: service_healthy }
+
+  notifications:
+    <<: *go-service
+    build: { context: ., dockerfile: services/notifications/Dockerfile }
+    env_file:
+      - path: services/notifications/.env.example
+      - path: services/notifications/.env
+        required: false
+    environment:
+      NOTIFICATIONS_PORT: "8083"
+      NOTIFICATIONS_CASSANDRA_HOSTS: cassandra:9042
+    expose: ["8083"]
+    depends_on:
+      cassandra: { condition: service_healthy }
+
+  sharing:
+    <<: *go-service
+    build: { context: ., dockerfile: services/sharing/Dockerfile }
+    env_file:
+      - path: services/sharing/.env.example
+      - path: services/sharing/.env
+        required: false
+    environment:
+      SHARING_PORT: "8084"
+      SHARING_NEO4J_URI: bolt://neo4j:7687
+      SHARING_NEO4J_USER: neo4j
+      SHARING_NEO4J_PASSWORD: ${NEO4J_PASSWORD:-change-me-neo4j}
+      USERS_SERVICE_URL: http://users:8081
+    expose: ["8084"]
+    depends_on:
+      neo4j: { condition: service_healthy }
+
+  analytics:
+    <<: *go-service
+    build: { context: ., dockerfile: services/analytics/Dockerfile }
+    env_file:
+      - path: services/analytics/.env.example
+      - path: services/analytics/.env
+        required: false
+    environment:
+      ANALYTICS_PORT: "8085"
+      ANALYTICS_CASSANDRA_HOSTS: cassandra:9042
+      FILES_SERVICE_URL: http://files:8082
+    expose: ["8085"]
+    depends_on:
+      cassandra: { condition: service_healthy }
+
+  # ---- baze i infrastruktura -----------------------------------------------
+  # MongoDB: jedna instanca, odvojene baze "users" i "files".
+  mongo:
+    image: mongo:8.0
+    restart: unless-stopped
+    networks: [backend]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  # Cassandra: Notifications i Analytics (odvojeni keyspace-ovi, RF=1 lokalno).
+  cassandra:
+    image: cassandra:5.0
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      MAX_HEAP_SIZE: 512M
+      HEAP_NEWSIZE: 128M
+      CASSANDRA_CLUSTER_NAME: file-storage
+    volumes: [cassandra-data:/var/lib/cassandra]
+    healthcheck:
+      test: ["CMD-SHELL", "cqlsh -e 'DESCRIBE KEYSPACES' >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
+      start_period: 60s
+
+  # Neo4j: Sharing (graf deljenja).
+  neo4j:
+    image: neo4j:5.26
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      NEO4J_AUTH: neo4j/${NEO4J_PASSWORD:-change-me-neo4j}
+    volumes: [neo4j-data:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NEO4J_AUTH#neo4j/}\" 'RETURN 1' >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
+
+  # MinIO: object store za sadržaj datoteka (Files).
+  # MinIO više ne objavljuje zvanične image-e (minio/minio na Docker Hub-u i
+  # quay.io nisu dostupni), pa se koristi Chainguard build. Besplatno je
+  # dostupan samo tag latest, zato je zakucan digest (isti image za sve u timu).
+  minio:
+    image: cgr.dev/chainguard/minio@sha256:7618b82bba99aadd77fcf59eb6cfd89b4b8b8e01ac796c474d57a1c1abf17e79
+    command: ["server", "/data"]
+    restart: unless-stopped
+    networks: [backend]
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-change-me}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-minio}
+    volumes: [minio-data:/data]
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # MailHog: lažni SMTP za razvoj (potvrda registracije, OTP).
+  # Web UI samo na localhost:8025 (razvojni alat, ne deo aplikacije).
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    restart: unless-stopped
+    networks: [backend, public]
+    ports:
+      - "127.0.0.1:8025:8025"
+
+networks:
+  # Interna mreža: bez izlaza ka spolja i bez objavljenih portova.
+  backend:
+    internal: true
+  # Samo za kontejnere koji moraju biti dostupni sa hosta (gateway, MailHog UI).
+  public: {}
+
+volumes:
+  mongo-data:
+  cassandra-data:
+  neo4j-data:
+  minio-data:
