@@ -3,6 +3,7 @@ module github.com/stefanbrmbota/file-storage-platform/services/users
 go 1.27.3
 
 require (
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	go.mongodb.org/mongo-driver/v2 v2.10.0
 	golang.org/x/crypto v0.59.0
 )

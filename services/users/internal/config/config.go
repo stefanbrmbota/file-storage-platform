@@ -34,6 +34,9 @@ type Config struct {
 
 	OTPHMACSecret string        // tajna za HMAC OTP-a; nikad se ne loguje
 	OTPTTL        time.Duration // rok vazenja OTP-a
+
+	JWTSecret string        // tajna za potpis JWT-a; nikad se ne loguje
+	JWTTTL    time.Duration // rok vazenja JWT-a
 }
 
 // Load cita konfiguraciju. Vraca gresku ako je podeseno samo jedno od
@@ -55,6 +58,7 @@ func Load() (Config, error) {
 		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/confirm"),
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
 		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
+		JWTSecret:         os.Getenv("JWT_SECRET"),
 	}
 	if (cfg.AdminEmail == "") != (cfg.AdminPassword == "") {
 		return Config{}, errors.New("config: ADMIN_EMAIL i ADMIN_PASSWORD moraju biti postavljeni zajedno")
@@ -78,6 +82,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.OTPTTL, err = getDuration("OTP_TTL", 5*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.JWTTTL, err = getDuration("JWT_TTL", 15*time.Minute); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil

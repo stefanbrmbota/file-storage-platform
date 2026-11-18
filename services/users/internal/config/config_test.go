@@ -94,3 +94,40 @@ func TestLoadConfirmationSettings(t *testing.T) {
 		}
 	})
 }
+
+func TestLoadJWTSettings(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevano", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "")
+		t.Setenv("JWT_TTL", "")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.JWTTTL != 15*time.Minute {
+			t.Errorf("JWTTTL = %v, ocekivano 15m", cfg.JWTTTL)
+		}
+		if cfg.JWTSecret != "" {
+			t.Error("JWTSecret ne sme imati podrazumevanu vrednost")
+		}
+	})
+	t.Run("iz env", func(t *testing.T) {
+		t.Setenv("JWT_SECRET", "tajna")
+		t.Setenv("JWT_TTL", "1h")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.JWTSecret != "tajna" || cfg.JWTTTL != time.Hour {
+			t.Errorf("neocekivano: %v %v", cfg.JWTSecret, cfg.JWTTTL)
+		}
+	})
+	t.Run("los TTL", func(t *testing.T) {
+		t.Setenv("JWT_TTL", "abc")
+		if _, err := Load(); err == nil {
+			t.Error("ocekivana greska")
+		}
+	})
+}
