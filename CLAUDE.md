@@ -42,6 +42,10 @@ MongoDB za lokalni razvoj (jednom; posle `docker start files-mongo`):
 ```
 docker run -d --name files-mongo -p 27017:27017 mongo:8.0
 ```
+MailHog za potvrdu registracije u razvoju (jednom; posle `docker start mailhog`; SMTP na 1025, UI na http://localhost:8025):
+```
+docker run -d --name mailhog -p 1025:1025 -p 8025:8025 mailhog/mailhog
+```
 Iz foldera servisa (npr. `cd services/files`), svaka komanda posebno (Windows PowerShell 5.1 ne podržava `&&`):
 ```
 go build ./...
