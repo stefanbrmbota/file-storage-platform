@@ -1,12 +1,47 @@
 # Dizajn sistema
 
-Dokument opisuje arhitekturu platforme (US-29). Popunjava se po podtaskovima:
+Dokument opisuje arhitekturu mikroservisne platforme za skladištenje i
+deljenje datoteka (US-29): šta svaki servis čuva, u kojoj bazi i zašto, i kako
+servisi komuniciraju. Služi kao zajednička referenca tima pri implementaciji
+story-ja; kada se story implementira drugačije nego što piše ovde, dokument se
+menja u istom PR-u.
 
-| Task | Sekcija | Stanje |
-|---|---|---|
-| T-29.1 | [Model podataka – Users i Files](#1-model-podataka--users-i-files) | gotovo |
-| T-29.2 | [Model podataka – Sharing](#2-model-podataka--sharing-neo4j), [Notifications](#3-model-podataka--notifications-cassandra), [Analytics i događaji](#4-model-podataka--analytics-cassandra-i-događaji) | gotovo |
-| T-29.3 | [Mapa komunikacije](#5-mapa-komunikacije) | gotovo |
+### Arhitektura ukratko
+
+Klijent komunicira samo sa **API gateway-em**, koji proverava JWT i
+prosleđuje zahtev jednom od pet servisa. Svaki servis ima svoju bazu, izabranu
+prema obliku podataka i upitima, i nijedan servis ne čita tuđu bazu. Servisi
+se međusobno pozivaju sinhrono (HTTP, uvek sa timeoutom) samo kada im odgovor
+treba odmah, a sve ostalo javljaju događajima preko brokera.
+
+| Servis | Odgovornost | Skladište | Zašto ta baza | Vlasnik |
+|---|---|---|---|---|
+| API gateway | Jedina ulazna tačka, provera JWT-a, rutiranje | — | — | AP |
+| Users | Registracija, prijava (lozinka + OTP), uloge, kvota | MongoDB | Nalozi kao dokumenti, jedinstven mejl, TTL indeksi za tokene i OTP | SC |
+| Files | Folderi, metapodaci datoteka, sadržaj, pretraga | MongoDB + MinIO | Stablo foldera i metapodaci kao dokumenti; sadržaj u object store-u | SB |
+| Sharing | Ko ima pristup čemu, nasleđivanje prava kroz foldere | Neo4j | Pravo nad folderom važi za ceo podgraf: upit po putanji | AP |
+| Notifications | Obaveštenja u aplikaciji | Cassandra | Mnogo upisa, čitanje po korisniku i vremenu | AP |
+| Analytics | Aktivnost i statistika iz događaja | Cassandra | Vremenska serija koja se samo dopunjuje, brojači po danu | AP |
+
+### Sadržaj
+
+1. [Model podataka – Users i Files](#1-model-podataka--users-i-files)
+2. [Model podataka – Sharing (Neo4j)](#2-model-podataka--sharing-neo4j)
+3. [Model podataka – Notifications (Cassandra)](#3-model-podataka--notifications-cassandra)
+4. [Model podataka – Analytics (Cassandra) i događaji](#4-model-podataka--analytics-cassandra-i-događaji)
+5. [Mapa komunikacije](#5-mapa-komunikacije)
+6. [Otvorene odluke](#6-otvorene-odluke)
+
+### Oznake
+
+- *Planirano*: deo dizajna koji još ne postoji u kodu (polje se ne koristi,
+  ruta ili poziv nisu napravljeni).
+- *Pretpostavka*: izvedeno iz opisa platforme, a ne iz kriterijuma
+  prihvatanja; potvrđuje se kada se story implementira.
+- *Predlog*: preporuka vlasniku servisa koju tek treba prihvatiti ili odbiti.
+
+Sve tri vrste su sakupljene u [sekciji 6](#6-otvorene-odluke), sa vlasnikom
+odluke.
 
 ---
 
@@ -20,7 +55,6 @@ nije u MongoDB-u nego u object store-u (**MinIO**, bucket `MINIO_BUCKET`).
 Oznake u tabelama:
 - **Obavezno**: polje uvek postoji i ima smislenu vrednost.
 - **Ka klijentu**: da li se polje serijalizuje u JSON odgovor (`json:"-"` = ne).
-- *Planirano*: polje postoji u modelu, ali ga kod još ne koristi.
 
 ### 1.1 Pregled
 
@@ -178,8 +212,10 @@ održava ovako:
 - **Kvota** (`usedBytes`): otpremanje je raspodeljena operacija (rezervacija
   prostora u Users → upis objekta u MinIO → upis metapodataka u Files). Ako neki
   korak padne, prethodni se poništavaju kompenzacijom (saga, `services/files`).
+  Tok je prikazan u 5.6, a poziv za kvotu je S3 u 5.4.
 - **Brisanje naloga**: brisanje korisnika mora da povuče brisanje njegovih
-  foldera, datoteka i MinIO objekata; i to ide kroz sagu ili događaj preko brokera.
+  foldera, datoteka i MinIO objekata. Users emituje događaj `user.deleted`, a
+  Files, Sharing, Notifications i Analytics svaki briše svoje podatke (5.5).
 - Svaki poziv drugog servisa ima timeout (`context.WithTimeout`).
 
 ### 1.5 Bezbednosne odluke u modelu (IB)
@@ -189,8 +225,10 @@ održava ovako:
 - Polja `passwordHash`, `objectKey` i `hash` imaju `json:"-"` i ne mogu
   procureti u odgovor; to proverava test `TestPasswordHashNotSerialized`.
 - ID-jevi korisnika su nasumični (128 bita), a folderi i datoteke imaju UUID v4,
-  pa se tuđi resursi ne mogu nabrojati pogađanjem ID-ja. Svaki upit nad
-  folderima i datotekama ipak filtrira i po `ownerId`.
+  pa se tuđi resursi ne mogu nabrojati pogađanjem ID-ja. Files servis ipak
+  posle svakog čitanja po ID-ju proverava `ownerId`, a tuđ folder vraća isto
+  kao nepostojeći, pa odgovor ne otkriva da resurs postoji. Pristup tuđem
+  resursu ide samo preko provere prava u Sharing servisu (S2 u 5.4).
 - Uloga se ne može zadati kroz registraciju: DTO nema polje `role`, a
   `model.NewUser` uvek postavlja `USER`.
 - Upiti koriste `bson.D` / `bson.M` sa vrednostima kao parametrima, bez spajanja
@@ -199,7 +237,7 @@ održava ovako:
 ### 1.6 Predlozi (nije implementirano)
 
 Sledeće se ne nalazi u kodu. Ovo su predlozi za vlasnike servisa (SB za Files,
-SC za Users), uz story kome pripadaju:
+SC za Users); stanje odluke za svaki je u sekciji 6:
 
 | Kolekcija | Predlog | Razlog |
 |---|---|---|
@@ -316,7 +354,8 @@ MATCH (:User {id: $granteeId})-[a:HAS_ACCESS]->(:Resource {id: $resourceId, owne
 DELETE a
 ```
 
-**Provera prava** (Files servis pita pre preuzimanja ili izmene tuđeg resursa):
+**Provera prava** (Files servis pita pre preuzimanja ili izmene tuđeg resursa,
+poziv S2 u 5.4):
 ```cypher
 MATCH (r:Resource {id: $resourceId})
 OPTIONAL MATCH (anc:Resource)-[:CONTAINS*0..]->(r)
@@ -532,8 +571,8 @@ Svaki događaj na brokeru je JSON sa istim omotačem:
 | `payload` | objekat | Podaci specifični za tip (4.2). |
 
 Isporuka sa brokera je **barem jednom** (at-least-once): događaj može stići
-više puta, pa svaki potrošač mora biti idempotentan. Izbor brokera i imena
-tema su deo Files dela (SB) i mape komunikacije.
+više puta, pa svaki potrošač mora biti idempotentan. Teme i pravila isporuke
+su u 5.5; izbor konkretnog brokera je deo Files dela (SB).
 
 ### 4.2 Katalog događaja
 
@@ -643,8 +682,9 @@ CREATE TABLE IF NOT EXISTS downloads_by_file (
     PRIMARY KEY ((file_id), day)
 ) WITH CLUSTERING ORDER BY (day DESC);
 ```
-Analytics ne proverava vlasništvo: upit A4 dozvoljava se samo vlasniku, a to
-proverava gateway ili Files servis pre poziva.
+Tabela ne čuva vlasnika datoteke (tabela sa brojačem ne može imati obične
+kolone). Upit A4 dozvoljava se samo vlasniku, pa Analytics pre čitanja pita
+Files servis ko je vlasnik (S5 u 5.4) i upoređuje ga sa `X-User-ID`.
 
 Kod `file.deleted` briše se particija datoteke u `downloads_by_file`. Kod
 `user.deleted` briše se particija korisnika u `daily_stats_by_user`, a u
@@ -1008,3 +1048,50 @@ sequenceDiagram
 - Klijent priča samo sa gateway-om; `/internal/*` rute nisu izložene (5.3).
 - Notifications i Analytics nemaju sinhronih poziva ka sebi od drugih servisa
   osim preko gateway-a, pa njihov pad ne utiče na rad sa datotekama.
+
+---
+
+## 6. Otvorene odluke
+
+Sekcija skuplja na jednom mestu sve što u dokumentu nosi oznaku *Planirano*,
+*Pretpostavka* ili *Predlog*, sa vlasnikom odluke. Kada se odluka donese ili
+story implementira, menja se kolona **Stanje** i tekst u sekciji na koju red
+upućuje.
+
+### 6.1 Odluke donete u dizajnu (potvrđuju se u review-u)
+
+| # | Odluka | Sekcija | Potvrđuje |
+|---|---|---|---|
+| D1 | Analytics koristi Cassandru (vremenska serija, isti klaster kao Notifications, poseban keyspace). | 4 | SB, SC |
+| D2 | Brisanje naloga se širi događajem `user.deleted`, ne sinhronim pozivima. | 1.4, 5.5 | SB, SC |
+| D3 | Ako Sharing ne odgovori, pristup tuđem resursu se odbija (fail closed). | 5.4 (S2) | SB |
+| D4 | Pri otpremanju u tuđi folder (`WRITE`) troši se kvota vlasnika foldera. | 5.4 (S3) | SB, SC |
+| D5 | Deljenje se zadaje mejlom primaoca; mejl ide u telo internog zahteva, a nepostojeći i neaktivan nalog daju isti odgovor. | 5.4 (S4) | SC |
+| D6 | Gateway briše `X-User-ID` / `X-User-Role` iz klijentskog zahteva i postavlja ih iz JWT-a; servisi veruju samo njima. | 5.3 | SB, SC |
+| D7 | Pristup tuđim resursima ide kroz iste Files rute, uz proveru prava u Sharing servisu, bez posebnog „shared“ API-ja. | 5.2 | SB |
+
+### 6.2 Otvoreno
+
+| # | Stavka | Vrsta | Sekcija | Vlasnik | Stanje |
+|---|---|---|---|---|---|
+| O1 | Odbijanje JWT-a izdatog pre `passwordChangedAt` | Planirano | 1.2, 5.3 | SC | otvoreno |
+| O2 | Limit pokušaja za OTP (`attempts`), posle čega se OTP briše | Planirano | 1.2, 1.6 | SC | otvoreno |
+| O3 | Indeks `{ role: 1, createdAt: -1 }` za admin pregled korisnika | Predlog | 1.6 | SC | otvoreno |
+| O4 | Interni endpointi za kvotu (`quota/reserve`, `quota/release`) i događaj `quota.threshold_reached` | Planirano | 4.2, 5.4 (S3) | SC | otvoreno |
+| O5 | Interni endpoint `POST /internal/users/lookup` | Planirano | 5.4 (S4) | SC | otvoreno |
+| O6 | Emitovanje događaja `user.activated`, `user.logged_in`, `user.deleted` | Planirano | 4.2 | SC | otvoreno |
+| O7 | Zaštita internih ruta (`X-Internal-Token` ili mTLS) i K8s NetworkPolicy | Predlog | 5.4 | SC, AP | otvoreno |
+| O8 | Ograničenje broja zahteva na `/api/auth/*` | Predlog | 5.3 | SC, AP | otvoreno |
+| O9 | Izbor brokera (i particionisanje po `ownerId` radi redosleda) | Planirano | 4.1, 5.5 | SB | otvoreno |
+| O10 | Transakcioni outbox za pouzdano emitovanje događaja | Predlog | 5.5 | SB, SC | otvoreno |
+| O11 | Emitovanje događaja `folder.*` i `file.*` | Planirano | 4.2 | SB | otvoreno |
+| O12 | Popunjavanje i provera `hash` sadržaja datoteke | Planirano | 1.3, 1.6 | SB | otvoreno |
+| O13 | Indeks za pretragu po nazivu (tekstualni ili `{ ownerId: 1, name: 1 }`) | Predlog | 1.6 | SB | otvoreno |
+| O14 | Unique indeks `{ objectKey: 1 }` | Predlog | 1.6 | SB | otvoreno |
+| O15 | Polje `ancestors` za operacije nad podstablom | Predlog | 1.6 | SB | otvoreno |
+| O16 | Interni endpoint `GET /internal/files/{id}/owner` | Planirano | 5.4 (S5) | SB | otvoreno |
+| O17 | Precizan skup operacija za `READ` i `WRITE` | Pretpostavka | 2.3 | AP | čeka story za deljenje |
+| O18 | Samo vlasnik može da deli (korisnik sa `WRITE` ne deli dalje) | Pretpostavka | 2.3 | AP | čeka story za deljenje |
+| O19 | Konačan spisak tipova obaveštenja | Pretpostavka | 3.5 | AP | čeka story za obaveštenja |
+| O20 | Konačan spisak metrika i prikaza analitike | Pretpostavka | 4.3 | AP | čeka story za analitiku |
+| O21 | Planirane rute spoljnog API-ja | Planirano | 5.2 | svi, po servisu | otvoreno |
