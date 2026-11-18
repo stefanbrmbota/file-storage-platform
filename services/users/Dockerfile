@@ -8,6 +8,12 @@ WORKDIR /src
 
 COPY pkg/ ./pkg/
 
+# Healthcheck program (pkg/healthcheck): distroless nema curl/shell, pa compose
+# poziva /app/healthcheck <port> da proveri GET /health.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    cd /src/pkg/healthcheck && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/healthcheck .
+
 COPY services/users/go.mod services/users/go.sum ./services/users/
 WORKDIR /src/services/users
 RUN --mount=type=cache,target=/go/pkg/mod \
@@ -24,6 +30,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=build /out/users /app/users
+COPY --from=build /out/healthcheck /app/healthcheck
 
 USER nonroot:nonroot
 

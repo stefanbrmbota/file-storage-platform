@@ -69,5 +69,8 @@ Pravila kad menjaš servis ili compose:
 - U Docker mreži se ide po imenu servisa iz compose-a (`http://users:8081`, `mongo:27017`, `cassandra:9042`, `bolt://neo4j:7687`, `minio:9000`, `mailhog:1025`), ne `localhost`.
 - Konfiguracija servisa: `<servis>/.env.example` pa opciono `<servis>/.env`; `environment:` u compose-u prepisuje samo adrese za Docker mrežu. Nova env promenljiva ide u `.env.example` servisa, a u compose samo ako je adresa drugog kontejnera.
 - Tajne koje deli više kontejnera (`JWT_SECRET`, MinIO, Neo4j) su u root `.env` (šablon `.env.example` u root-u).
-- Kad servis počne stvarno da koristi bazu ili drugi servis, proveri `depends_on` u compose-u (baze imaju healthcheck, Go servisi nemaju jer su distroless).
+- Healthcheck (T-33.3): svaki kontejner ga ima, a svaki `depends_on` koristi `condition: service_healthy`. Redosled je baze → servisi → gateway. Go image-i su distroless (bez curl-a i shell-a), pa se proverava programom `/app/healthcheck <port>` iz `pkg/healthcheck`, koji zove `GET /health`. Zato svaki Go servis MORA imati `GET /health`, a novi Dockerfile se pravi iz `docker/Dockerfile.template`, koji već gradi i kopira healthcheck.
+- Kad servis počne stvarno da koristi bazu ili drugi servis, dodaj taj kontejner u njegov `depends_on` sa `service_healthy`.
+- Podaci baza su u imenovanim volume-ima (`mongo-data`, `cassandra-data`, `neo4j-data`, `minio-data`) i ostaju posle `docker compose down`; briše ih samo `down -v`.
+- Git Bash na Windows-u: za `docker compose exec <servis> /app/...` prvo `export MSYS_NO_PATHCONV=1`, inače se putanja pretvori u Windows putanju.
 - Lokalni rad bez Docker-a (`go run ./cmd/server`) i dalje koristi `localhost` adrese iz `.env.example`.

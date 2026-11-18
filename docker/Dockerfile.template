@@ -22,6 +22,12 @@ WORKDIR /src
 # go mod download mogao da ih razreši.
 COPY pkg/ ./pkg/
 
+# Healthcheck program (pkg/healthcheck): distroless nema curl/shell, pa compose
+# poziva /app/healthcheck <port> da proveri GET /health.
+RUN --mount=type=cache,target=/root/.cache/go-build \
+    cd /src/pkg/healthcheck && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/healthcheck .
+
 # Prvo samo go.mod/go.sum: sloj sa zavisnostima se kešira dok se oni ne promene.
 # go.sum* jer modul bez spoljnih zavisnosti nema go.sum.
 COPY <SERVICE_DIR>/go.mod <SERVICE_DIR>/go.sum* ./<SERVICE_DIR>/
@@ -47,6 +53,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
 FROM gcr.io/distroless/static-debian12:nonroot
 
 COPY --from=build /out/<SERVICE> /app/<SERVICE>
+COPY --from=build /out/healthcheck /app/healthcheck
 
 USER nonroot:nonroot
 
