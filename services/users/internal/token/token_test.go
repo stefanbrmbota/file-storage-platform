@@ -47,6 +47,24 @@ func TestIssueParse_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestIssue_HasUniqueJTIAndParseReturnsIt(t *testing.T) {
+	m := newTestManager(t)
+	a, _ := m.Issue("u1", model.RoleUser)
+	b, _ := m.Issue("u1", model.RoleUser)
+
+	ca, err := m.Parse(a)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cb, _ := m.Parse(b)
+	if len(ca.ID) != 32 || ca.ID == cb.ID {
+		t.Errorf("jti nije jedinstven 128-bitni: %q %q", ca.ID, cb.ID)
+	}
+	if ca.ExpiresAt.IsZero() || !ca.ExpiresAt.After(time.Now()) {
+		t.Errorf("ExpiresAt = %v", ca.ExpiresAt)
+	}
+}
+
 func TestIssue_RejectsBadInput(t *testing.T) {
 	m := newTestManager(t)
 	if _, err := m.Issue("", model.RoleUser); err == nil {
