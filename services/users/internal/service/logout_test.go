@@ -68,6 +68,38 @@ func TestLogout_TokenWithoutJTI(t *testing.T) {
 	}
 }
 
+func TestIsRevoked_AfterLogout(t *testing.T) {
+	rev := &fakeRevoked{}
+	s := NewLogoutService(fakeParser{claims: token.Claims{ID: "jti-1", ExpiresAt: time.Now().Add(time.Hour)}}, rev)
+
+	if ok, err := s.IsRevoked(context.Background(), "jti-1"); err != nil || ok {
+		t.Fatalf("prije odjave: ok=%v err=%v", ok, err)
+	}
+	if err := s.Logout(context.Background(), "tok"); err != nil {
+		t.Fatal(err)
+	}
+	if ok, err := s.IsRevoked(context.Background(), "jti-1"); err != nil || !ok {
+		t.Fatalf("poslije odjave: ok=%v err=%v", ok, err)
+	}
+}
+
+func TestIsRevoked_RepositoryError(t *testing.T) {
+	boom := errors.New("baza pala")
+	s := NewLogoutService(fakeParser{}, &fakeRevokedErr{err: boom})
+	if _, err := s.IsRevoked(context.Background(), "j"); !errors.Is(err, boom) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
+type fakeRevokedErr struct {
+	fakeRevoked
+	err error
+}
+
+func (f *fakeRevokedErr) IsRevoked(context.Context, string, time.Time) (bool, error) {
+	return false, f.err
+}
+
 func TestLogout_RepositoryError(t *testing.T) {
 	boom := errors.New("baza pala")
 	s := NewLogoutService(fakeParser{claims: token.Claims{ID: "j", ExpiresAt: time.Now().Add(time.Hour)}}, &fakeRevoked{err: boom})
