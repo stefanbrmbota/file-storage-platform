@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/token"
@@ -22,11 +23,23 @@ type TokenParser interface {
 type LogoutService struct {
 	tokens  TokenParser
 	revoked repository.RevokedTokenRepository
+	now     func() time.Time
 }
 
 // NewLogoutService vraća servis za odjavu.
 func NewLogoutService(tokens TokenParser, revoked repository.RevokedTokenRepository) *LogoutService {
-	return &LogoutService{tokens: tokens, revoked: revoked}
+	return &LogoutService{tokens: tokens, revoked: revoked, now: func() time.Time { return time.Now().UTC() }}
+}
+
+// IsRevoked vraća true ako je token sa datim jti opozvan odjavom (i još nije
+// istekao). Poziva se pri svakoj proveri JWT-a; greška baze se vraća pozivaocu,
+// koji mora odbiti zahtev (fail closed).
+func (s *LogoutService) IsRevoked(ctx context.Context, jti string) (bool, error) {
+	revoked, err := s.revoked.IsRevoked(ctx, jti, s.now())
+	if err != nil {
+		return false, fmt.Errorf("provera opoziva: %w", err)
+	}
+	return revoked, nil
 }
 
 // Logout proverava token i upisuje njegov jti u listu opozvanih; zapis nestaje
