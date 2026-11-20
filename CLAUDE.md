@@ -42,6 +42,10 @@ MongoDB za lokalni razvoj (jednom; posle `docker start files-mongo`):
 ```
 docker run -d --name files-mongo -p 27017:27017 mongo:8.0
 ```
+MinIO za lokalni razvoj Files servisa (jednom; posle `docker start files-minio`; isti kredencijali kao u `services/files/.env.example`):
+```
+docker run -d --name files-minio -p 9000:9000 -e MINIO_ROOT_USER=change-me -e MINIO_ROOT_PASSWORD=change-me-minio cgr.dev/chainguard/minio@sha256:7618b82bba99aadd77fcf59eb6cfd89b4b8b8e01ac796c474d57a1c1abf17e79 server /data
+```
 MailHog za potvrdu registracije u razvoju (jednom; posle `docker start mailhog`; SMTP na 1025, UI na http://localhost:8025):
 ```
 docker run -d --name mailhog -p 1025:1025 -p 8025:8025 mailhog/mailhog

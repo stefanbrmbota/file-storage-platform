@@ -15,6 +15,7 @@ type Config struct {
 	MinioAccessKey  string
 	MinioSecretKey  string
 	MinioBucket     string
+	MinioUseSSL     bool
 	UsersServiceURL string
 	RequestTimeout  time.Duration
 }
@@ -28,6 +29,7 @@ func Load() Config {
 		MinioAccessKey:  os.Getenv("MINIO_ACCESS_KEY"),
 		MinioSecretKey:  os.Getenv("MINIO_SECRET_KEY"),
 		MinioBucket:     getEnv("MINIO_BUCKET", "files"),
+		MinioUseSSL:     os.Getenv("MINIO_USE_SSL") == "true",
 		UsersServiceURL: getEnv("USERS_SERVICE_URL", "http://localhost:8081"),
 		RequestTimeout:  getDuration("FILES_REQUEST_TIMEOUT", 5*time.Second),
 	}
