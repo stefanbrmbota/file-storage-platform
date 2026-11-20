@@ -50,6 +50,43 @@ func (m *memFolders) ListByParent(_ context.Context, ownerID, parentID string) (
 }
 
 func (m *memFolders) Rename(_ context.Context, id, name string, updatedAt time.Time) error {
+	target, err := m.FindByID(context.Background(), id)
+	if err != nil {
+		return err
+	}
+	for _, f := range m.items {
+		if f.ID != id && f.OwnerID == target.OwnerID && f.ParentID == target.ParentID && f.Name == name {
+			return repository.ErrDuplicateName
+		}
+	}
+	target.Name, target.UpdatedAt = name, updatedAt
+	return nil
+}
+
+// memFiles is a tiny in-memory file store for handler tests.
+type memFiles struct{ items []*model.File }
+
+func (m *memFiles) FindByID(_ context.Context, id string) (*model.File, error) {
+	for _, f := range m.items {
+		if f.ID == id {
+			found := *f
+			return &found, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (m *memFiles) ListByParent(_ context.Context, ownerID, parentID string) ([]model.File, error) {
+	out := []model.File{}
+	for _, f := range m.items {
+		if f.OwnerID == ownerID && f.ParentID == parentID {
+			out = append(out, *f)
+		}
+	}
+	return out, nil
+}
+
+func (m *memFiles) Rename(_ context.Context, id, name string, updatedAt time.Time) error {
 	for _, f := range m.items {
 		if f.ID == id {
 			f.Name, f.UpdatedAt = name, updatedAt
@@ -59,24 +96,18 @@ func (m *memFolders) Rename(_ context.Context, id, name string, updatedAt time.T
 	return repository.ErrNotFound
 }
 
-type memFiles struct{}
-
-func (memFiles) FindByID(context.Context, string) (*model.File, error) {
-	return nil, repository.ErrNotFound
-}
-
-func (memFiles) ListByParent(context.Context, string, string) ([]model.File, error) {
-	return []model.File{}, nil
-}
-
-func (memFiles) Rename(context.Context, string, string, time.Time) error {
-	return repository.ErrNotFound
-}
-
 // newTestHandler returns a handler where user "ana" has root/Fakultet.
 func newTestHandler(t *testing.T) (*Handler, *model.Folder) {
+	h, fakultet, _ := newTestHandlerWithFiles(t)
+	return h, fakultet
+}
+
+// newTestHandlerWithFiles also gives "ana" the file cv.pdf in her root.
+func newTestHandlerWithFiles(t *testing.T) (*Handler, *model.Folder, *memFiles) {
 	t.Helper()
-	svc := service.NewFolderService(&memFolders{}, memFiles{})
+	files := &memFiles{}
+	folders := &memFolders{}
+	svc := service.NewFolderService(folders, files)
 	ctx := context.Background()
 	if _, _, err := svc.CreateRoot(ctx, "ana"); err != nil {
 		t.Fatal(err)
@@ -85,7 +116,9 @@ func newTestHandler(t *testing.T) (*Handler, *model.Folder) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return New(svc), fakultet
+	root, _ := folders.FindRoot(ctx, "ana")
+	files.items = []*model.File{{ID: "f1", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID}}
+	return New(svc), fakultet, files
 }
 
 func getContents(h *Handler, id, user string) *httptest.ResponseRecorder {
