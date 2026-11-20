@@ -15,6 +15,7 @@ import (
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/handler"
+	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/objectstore"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/service"
 )
@@ -49,6 +50,19 @@ func main() {
 		os.Exit(1)
 	}
 	folders := service.NewFolderService(folderRepo, fileRepo)
+
+	// Connect to MinIO and create the bucket if needed. The upload (US-02)
+	// will use this store; for now we only check that MinIO works at startup.
+	if _, err := objectstore.New(startCtx, objectstore.Config{
+		Endpoint:  cfg.MinioEndpoint,
+		AccessKey: cfg.MinioAccessKey,
+		SecretKey: cfg.MinioSecretKey,
+		Bucket:    cfg.MinioBucket,
+		UseSSL:    cfg.MinioUseSSL,
+	}); err != nil {
+		logger.Error("object store init failed", "err", err)
+		os.Exit(1)
+	}
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
