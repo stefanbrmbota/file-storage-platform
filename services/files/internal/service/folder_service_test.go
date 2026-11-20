@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
@@ -58,9 +59,53 @@ func (s *fakeStore) ListByParent(_ context.Context, ownerID, parentID string) ([
 	return out, nil
 }
 
+func (s *fakeStore) Rename(_ context.Context, id, name string, updatedAt time.Time) error {
+	f, ok := s.folders[id]
+	if !ok {
+		return repository.ErrNotFound
+	}
+	for _, other := range s.folders {
+		if other.ID != id && other.OwnerID == f.OwnerID && other.ParentID == f.ParentID && other.Name == name {
+			return repository.ErrDuplicateName
+		}
+	}
+	f.Name, f.UpdatedAt = name, updatedAt
+	return nil
+}
+
 // fakeFileStore keeps file metadata in memory.
 type fakeFileStore struct {
 	files []model.File
+}
+
+func (s *fakeFileStore) FindByID(_ context.Context, id string) (*model.File, error) {
+	for i := range s.files {
+		if s.files[i].ID == id {
+			f := s.files[i]
+			return &f, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (s *fakeFileStore) Rename(_ context.Context, id, name string, updatedAt time.Time) error {
+	idx := -1
+	for i := range s.files {
+		if s.files[i].ID == id {
+			idx = i
+		}
+	}
+	if idx < 0 {
+		return repository.ErrNotFound
+	}
+	f := s.files[idx]
+	for _, other := range s.files {
+		if other.ID != id && other.OwnerID == f.OwnerID && other.ParentID == f.ParentID && other.Name == name {
+			return repository.ErrDuplicateName
+		}
+	}
+	s.files[idx].Name, s.files[idx].UpdatedAt = name, updatedAt
+	return nil
 }
 
 func (s *fakeFileStore) ListByParent(_ context.Context, ownerID, parentID string) ([]model.File, error) {

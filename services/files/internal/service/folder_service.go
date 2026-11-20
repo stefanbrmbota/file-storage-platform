@@ -23,7 +23,7 @@ const (
 var (
 	ErrInvalidName    = errors.New("invalid folder name")
 	ErrParentNotFound = errors.New("parent folder not found")
-	ErrNameTaken      = errors.New("folder with this name already exists")
+	ErrNameTaken      = errors.New("an item with this name already exists in the folder")
 )
 
 // FolderStore is what the service needs from the database. The real
@@ -33,12 +33,15 @@ type FolderStore interface {
 	FindByID(ctx context.Context, id string) (*model.Folder, error)
 	FindRoot(ctx context.Context, ownerID string) (*model.Folder, error)
 	ListByParent(ctx context.Context, ownerID, parentID string) ([]model.Folder, error)
+	Rename(ctx context.Context, id, name string, updatedAt time.Time) error
 }
 
 // FileStore is what the service needs for file metadata. The real
 // implementation is repository.FileRepository.
 type FileStore interface {
+	FindByID(ctx context.Context, id string) (*model.File, error)
 	ListByParent(ctx context.Context, ownerID, parentID string) ([]model.File, error)
+	Rename(ctx context.Context, id, name string, updatedAt time.Time) error
 }
 
 type FolderService struct {
