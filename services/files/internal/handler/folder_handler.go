@@ -53,6 +53,48 @@ func (h *Handler) folderContents(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, contents)
 }
 
+type renameRequest struct {
+	Name string `json:"name"`
+}
+
+// PATCH /folders/{id}  {"name": "Novi naziv"}
+func (h *Handler) renameFolder(w http.ResponseWriter, r *http.Request) {
+	owner, ok := userID(w, r)
+	if !ok {
+		return
+	}
+	var req renameRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+
+	folder, err := h.folders.RenameFolder(r.Context(), owner, r.PathValue("id"), req.Name)
+	if err != nil {
+		writeFolderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, folder)
+}
+
+// PATCH /files/{id}  {"name": "novi-naziv.pdf"}
+func (h *Handler) renameFile(w http.ResponseWriter, r *http.Request) {
+	owner, ok := userID(w, r)
+	if !ok {
+		return
+	}
+	var req renameRequest
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+
+	file, err := h.folders.RenameFile(r.Context(), owner, r.PathValue("id"), req.Name)
+	if err != nil {
+		writeFolderError(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, file)
+}
+
 // POST /internal/folders/root  {"userId": "..."}
 // Called by the Users service after registration (US-04).
 func (h *Handler) createRootFolder(w http.ResponseWriter, r *http.Request) {
@@ -80,9 +122,10 @@ func (h *Handler) createRootFolder(w http.ResponseWriter, r *http.Request) {
 // writeFolderError maps service errors to HTTP status codes.
 func writeFolderError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, service.ErrInvalidName):
+	case errors.Is(err, service.ErrInvalidName), errors.Is(err, service.ErrCannotRenameRoot):
 		writeError(w, http.StatusBadRequest, err.Error())
-	case errors.Is(err, service.ErrParentNotFound), errors.Is(err, service.ErrFolderNotFound):
+	case errors.Is(err, service.ErrParentNotFound), errors.Is(err, service.ErrFolderNotFound),
+		errors.Is(err, service.ErrFileNotFound):
 		writeError(w, http.StatusNotFound, err.Error())
 	case errors.Is(err, service.ErrNameTaken):
 		writeError(w, http.StatusConflict, err.Error())
