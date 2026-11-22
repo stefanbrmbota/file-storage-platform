@@ -74,6 +74,43 @@ func TestFolderRename(t *testing.T) {
 	}
 }
 
+func TestFileCreate(t *testing.T) {
+	ctx := context.Background()
+	repo, err := NewFileRepository(ctx, testDB(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC().Truncate(time.Millisecond)
+	f := &model.File{
+		ID: "1", Name: "cv.pdf", ContentType: "application/pdf", Size: 1234,
+		OwnerID: "ana", ParentID: "root", ObjectKey: "obj-1", Hash: "abc",
+		CreatedAt: now, UpdatedAt: now,
+	}
+
+	if err := repo.Create(ctx, f); err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	got, err := repo.FindByID(ctx, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if *got != *f {
+		t.Errorf("stored file differs:\n got %+v\nwant %+v", *got, *f)
+	}
+
+	dup := *f
+	dup.ID = "2"
+	if err := repo.Create(ctx, &dup); !errors.Is(err, ErrDuplicateName) {
+		t.Errorf("same name in same folder: err = %v, want ErrDuplicateName", err)
+	}
+
+	other := *f
+	other.ID, other.ParentID = "3", "drugi-folder"
+	if err := repo.Create(ctx, &other); err != nil {
+		t.Errorf("same name in another folder should work: %v", err)
+	}
+}
+
 func TestFileFindAndRename(t *testing.T) {
 	ctx := context.Background()
 	repo, err := NewFileRepository(ctx, testDB(t))

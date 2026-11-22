@@ -35,6 +35,16 @@ func NewFileRepository(ctx context.Context, db *mongo.Database) (*FileRepository
 	return &FileRepository{coll: coll}, nil
 }
 
+// Create saves the metadata of a new file. The unique index rejects a second
+// file with the same name in the same folder.
+func (r *FileRepository) Create(ctx context.Context, f *model.File) error {
+	_, err := r.coll.InsertOne(ctx, f)
+	if mongo.IsDuplicateKeyError(err) {
+		return ErrDuplicateName
+	}
+	return err
+}
+
 func (r *FileRepository) FindByID(ctx context.Context, id string) (*model.File, error) {
 	var f model.File
 	err := r.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&f)
