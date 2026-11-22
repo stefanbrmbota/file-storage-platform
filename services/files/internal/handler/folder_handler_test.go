@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
@@ -48,10 +49,28 @@ func (m *memFolders) ListByParent(_ context.Context, ownerID, parentID string) (
 	return out, nil
 }
 
+func (m *memFolders) Rename(_ context.Context, id, name string, updatedAt time.Time) error {
+	for _, f := range m.items {
+		if f.ID == id {
+			f.Name, f.UpdatedAt = name, updatedAt
+			return nil
+		}
+	}
+	return repository.ErrNotFound
+}
+
 type memFiles struct{}
+
+func (memFiles) FindByID(context.Context, string) (*model.File, error) {
+	return nil, repository.ErrNotFound
+}
 
 func (memFiles) ListByParent(context.Context, string, string) ([]model.File, error) {
 	return []model.File{}, nil
+}
+
+func (memFiles) Rename(context.Context, string, string, time.Time) error {
+	return repository.ErrNotFound
 }
 
 // newTestHandler returns a handler where user "ana" has root/Fakultet.
