@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/minio/minio-go/v7"
 )
 
 // testConfig returns settings for a real MinIO with a fresh bucket name.
@@ -27,9 +28,16 @@ func testConfig(t *testing.T) Config {
 		Bucket:    "test-" + uuid.NewString()[:8],
 	}
 	t.Cleanup(func() {
-		if s, err := New(context.Background(), cfg); err == nil {
-			_ = s.client.RemoveBucket(context.Background(), cfg.Bucket)
+		ctx := context.Background()
+		s, err := New(ctx, cfg)
+		if err != nil {
+			return
 		}
+		// A bucket can only be removed when it is empty.
+		for obj := range s.client.ListObjects(ctx, cfg.Bucket, minio.ListObjectsOptions{Recursive: true}) {
+			_ = s.client.RemoveObject(ctx, cfg.Bucket, obj.Key, minio.RemoveObjectOptions{})
+		}
+		_ = s.client.RemoveBucket(ctx, cfg.Bucket)
 	})
 	return cfg
 }
