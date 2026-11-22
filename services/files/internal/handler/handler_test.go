@@ -11,7 +11,7 @@ func TestHealth(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/health", nil)
 	rec := httptest.NewRecorder()
 
-	New(nil).Routes().ServeHTTP(rec, req)
+	New(nil, nil, 0).Routes().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
@@ -25,7 +25,7 @@ func TestCreateFolderRequiresUser(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/folders", strings.NewReader(`{"name":"a"}`))
 	rec := httptest.NewRecorder()
 
-	New(nil).Routes().ServeHTTP(rec, req)
+	New(nil, nil, 0).Routes().ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusUnauthorized)
@@ -38,7 +38,7 @@ func TestCreateFolderRejectsBadJSON(t *testing.T) {
 		req.Header.Set("X-User-ID", "ana")
 		rec := httptest.NewRecorder()
 
-		New(nil).Routes().ServeHTTP(rec, req)
+		New(nil, nil, 0).Routes().ServeHTTP(rec, req)
 
 		if rec.Code != http.StatusBadRequest {
 			t.Errorf("body %q: status = %d, want %d", body, rec.Code, http.StatusBadRequest)

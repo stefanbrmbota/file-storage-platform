@@ -2,6 +2,7 @@ package config
 
 import (
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -18,6 +19,7 @@ type Config struct {
 	MinioUseSSL     bool
 	UsersServiceURL string
 	RequestTimeout  time.Duration
+	MaxUploadBytes  int64
 }
 
 func Load() Config {
@@ -32,7 +34,17 @@ func Load() Config {
 		MinioUseSSL:     os.Getenv("MINIO_USE_SSL") == "true",
 		UsersServiceURL: getEnv("USERS_SERVICE_URL", "http://localhost:8081"),
 		RequestTimeout:  getDuration("FILES_REQUEST_TIMEOUT", 5*time.Second),
+		MaxUploadBytes:  getInt64("FILES_MAX_UPLOAD_BYTES", 100<<20), // 100 MB
 	}
+}
+
+func getInt64(key string, fallback int64) int64 {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n > 0 {
+			return n
+		}
+	}
+	return fallback
 }
 
 func getEnv(key, fallback string) string {

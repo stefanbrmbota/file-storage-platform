@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
+	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/client"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/handler"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/objectstore"
@@ -26,18 +27,18 @@ func main() {
 	cfg := config.Load()
 
 	// Connect to MongoDB and check that it answers before accepting requests.
-	client, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(cfg.MongoURI))
 	if err != nil {
 		logger.Error("mongo connect failed", "err", err)
 		os.Exit(1)
 	}
 	startCtx, cancelStart := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancelStart()
-	if err := client.Ping(startCtx, nil); err != nil {
+	if err := mongoClient.Ping(startCtx, nil); err != nil {
 		logger.Error("mongo is not reachable", "err", err)
 		os.Exit(1)
 	}
-	db := client.Database(cfg.MongoDB)
+	db := mongoClient.Database(cfg.MongoDB)
 
 	folderRepo, err := repository.NewFolderRepository(startCtx, db)
 	if err != nil {
@@ -51,26 +52,30 @@ func main() {
 	}
 	folders := service.NewFolderService(folderRepo, fileRepo)
 
-	// Connect to MinIO and create the bucket if needed. The upload (US-02)
-	// will use this store; for now we only check that MinIO works at startup.
-	if _, err := objectstore.New(startCtx, objectstore.Config{
+	// Connect to MinIO and create the bucket if needed.
+	objects, err := objectstore.New(startCtx, objectstore.Config{
 		Endpoint:  cfg.MinioEndpoint,
 		AccessKey: cfg.MinioAccessKey,
 		SecretKey: cfg.MinioSecretKey,
 		Bucket:    cfg.MinioBucket,
 		UseSSL:    cfg.MinioUseSSL,
-	}); err != nil {
+	})
+	if err != nil {
 		logger.Error("object store init failed", "err", err)
 		os.Exit(1)
 	}
 
+	users := client.NewUsersClient(cfg.UsersServiceURL, cfg.RequestTimeout)
+	files := service.NewFileService(folders, fileRepo, objects, users)
+
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           handler.New(folders).Routes(),
+		Handler:           handler.New(folders, files, cfg.MaxUploadBytes).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
+		// Uploads can be large, so reading the request may take a while.
+		ReadTimeout:  5 * time.Minute,
+		WriteTimeout: 30 * time.Second,
+		IdleTimeout:  60 * time.Second,
 	}
 
 	go func() {
@@ -90,7 +95,7 @@ func main() {
 	if err := srv.Shutdown(ctx); err != nil {
 		logger.Error("shutdown failed", "err", err)
 	}
-	if err := client.Disconnect(ctx); err != nil {
+	if err := mongoClient.Disconnect(ctx); err != nil {
 		logger.Error("mongo disconnect failed", "err", err)
 	}
 	logger.Info("files service stopped")

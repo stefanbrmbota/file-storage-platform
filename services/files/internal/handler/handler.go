@@ -8,11 +8,14 @@ import (
 )
 
 type Handler struct {
-	folders *service.FolderService
+	folders        *service.FolderService
+	files          *service.FileService
+	maxUploadBytes int64
 }
 
-func New(folders *service.FolderService) *Handler {
-	return &Handler{folders: folders}
+// New creates the handler. maxUploadBytes limits the size of one upload request.
+func New(folders *service.FolderService, files *service.FileService, maxUploadBytes int64) *Handler {
+	return &Handler{folders: folders, files: files, maxUploadBytes: maxUploadBytes}
 }
 
 // Routes registers all HTTP routes of the Files service.
@@ -24,6 +27,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("GET /folders/{id}/contents", h.folderContents)
 	mux.HandleFunc("PATCH /folders/{id}", h.renameFolder)
 	mux.HandleFunc("PATCH /files/{id}", h.renameFile)
+	mux.HandleFunc("POST /folders/{id}/files", h.uploadFile)
 	mux.HandleFunc("POST /internal/folders/root", h.createRootFolder)
 	return mux
 }

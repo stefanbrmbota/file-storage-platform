@@ -118,7 +118,7 @@ func newTestHandlerWithFiles(t *testing.T) (*Handler, *model.Folder, *memFiles) 
 	}
 	root, _ := folders.FindRoot(ctx, "ana")
 	files.items = []*model.File{{ID: "f1", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID}}
-	return New(svc), fakultet, files
+	return New(svc, nil, 0), fakultet, files
 }
 
 func getContents(h *Handler, id, user string) *httptest.ResponseRecorder {
