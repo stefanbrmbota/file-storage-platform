@@ -28,6 +28,13 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
+	// Gateway ima eksplicitnu listu ruta (T-30.2, design 5.2); sve ostalo,
+	// ukljucujuci /internal/..., vraca 404 (design 5.3, tacka 4).
+	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte(`{"error":"not found"}`))
+	})
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -39,7 +46,11 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("gateway service started", "port", cfg.Port)
+		logger.Info("gateway service started", "port", cfg.Port,
+			"upstream_timeout", cfg.UpstreamTimeout.String(),
+			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
+			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
+			"analytics", cfg.AnalyticsURL.Host)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)
