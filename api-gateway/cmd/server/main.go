@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/routes"
 )
 
 func main() {
@@ -28,12 +30,14 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	// Gateway ima eksplicitnu listu ruta (T-30.2, design 5.2); sve ostalo,
-	// ukljucujuci /internal/..., vraca 404 (design 5.3, tacka 4).
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":"not found"}`))
+	// Eksplicitna lista ruta (design 5.2); sve ostalo, ukljucujuci
+	// /internal/..., vraca 404 (design 5.3, tacka 4).
+	routes.Register(mux, map[routes.Service]http.Handler{
+		routes.Users:         proxy.New(cfg.UsersURL, cfg.UpstreamTimeout, logger),
+		routes.Files:         proxy.New(cfg.FilesURL, cfg.UpstreamTimeout, logger),
+		routes.Sharing:       proxy.New(cfg.SharingURL, cfg.UpstreamTimeout, logger),
+		routes.Notifications: proxy.New(cfg.NotificationsURL, cfg.UpstreamTimeout, logger),
+		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
 	})
 
 	srv := &http.Server{
