@@ -21,6 +21,20 @@ type hit struct {
 	query   string
 }
 
+// headerGuard je lazni guard: propusta zahtev i belezi nivo pristupa u
+// headeru X-Test-Access, da test vidi koja provera je primenjena.
+type headerGuard struct{}
+
+func mark(level string, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Test-Access", level)
+		next.ServeHTTP(w, r)
+	})
+}
+
+func (headerGuard) Require(next http.Handler) http.Handler      { return mark("user", next) }
+func (headerGuard) RequireAdmin(next http.Handler) http.Handler { return mark("admin", next) }
+
 // newMux registruje rute sa laznim servisima koji samo belezi zahtev.
 func newMux(t *testing.T) (*http.ServeMux, *[]hit) {
 	t.Helper()
@@ -33,7 +47,7 @@ func newMux(t *testing.T) (*http.ServeMux, *[]hit) {
 		})
 	}
 	mux := http.NewServeMux()
-	Register(mux, upstreams)
+	Register(mux, upstreams, headerGuard{})
 	return mux, &hits
 }
 
@@ -47,6 +61,7 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 		{"POST", "/api/auth/confirm", Users, "/confirm"},
 		{"POST", "/api/auth/login", Users, "/login"},
 		{"POST", "/api/auth/login/verify", Users, "/login/verify"},
+		{"POST", "/api/auth/logout", Users, "/logout"},
 		{"GET", "/api/users/me", Users, "/users/me"},
 		{"GET", "/api/admin/users", Users, "/admin/users"},
 		{"POST", "/api/folders", Files, "/folders"},
@@ -88,6 +103,47 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestAccessLevels(t *testing.T) {
+	public := map[string]bool{
+		"POST /api/auth/register": true, "POST /api/auth/confirm": true,
+		"POST /api/auth/login": true, "POST /api/auth/login/verify": true,
+	}
+	admin := map[string]bool{"GET /api/admin/users": true}
+
+	for _, rt := range All {
+		t.Run(rt.Pattern, func(t *testing.T) {
+			want := "user"
+			switch {
+			case public[rt.Pattern]:
+				want = ""
+			case admin[rt.Pattern]:
+				want = "admin"
+			}
+			method, path, _ := strings.Cut(rt.Pattern, " ")
+			path = strings.NewReplacer("{id}", "x", "{resourceId}", "r", "{granteeId}", "g").Replace(path)
+
+			mux, _ := newMux(t)
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+			if got := rec.Header().Get("X-Test-Access"); got != want {
+				t.Errorf("provera = %q, ocekivano %q", got, want)
+			}
+		})
+	}
+}
+
+func TestRegisterPanicsWithoutGuard(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("ocekivan panic bez guard-a")
+		}
+	}()
+	h := http.NotFoundHandler()
+	Register(http.NewServeMux(), map[Service]http.Handler{
+		Users: h, Files: h, Sharing: h, Notifications: h, Analytics: h,
+	}, nil)
 }
 
 func TestQueryIsForwarded(t *testing.T) {
@@ -147,7 +203,7 @@ func TestRegisterPanicsWithoutUpstream(t *testing.T) {
 			t.Fatal("ocekivan panic kad servis nema handler")
 		}
 	}()
-	Register(http.NewServeMux(), map[Service]http.Handler{Users: http.NotFoundHandler()})
+	Register(http.NewServeMux(), map[Service]http.Handler{Users: http.NotFoundHandler()}, headerGuard{})
 }
 
 // TestThroughProxy proverava ceo put: ruta → proxy → servis.
@@ -165,7 +221,7 @@ func TestThroughProxy(t *testing.T) {
 	mux := http.NewServeMux()
 	Register(mux, map[Service]http.Handler{
 		Users: p, Files: p, Sharing: p, Notifications: p, Analytics: p,
-	})
+	}, headerGuard{})
 
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, httptest.NewRequest("POST", "/api/auth/login/verify?x=1", strings.NewReader(`{}`)))
