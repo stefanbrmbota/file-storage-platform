@@ -861,6 +861,19 @@ servisa (S2).
    `502`/`504` sa opštom porukom, bez internih detalja.
 6. **Adrese servisa** samo iz env promenljivih (`USERS_SERVICE_URL`,
    `FILES_SERVICE_URL`, ...).
+7. **Jedinstven format greške.** Svaka greška ka klijentu je
+   `{"error": "..."}` sa odgovarajućim statusom. Greške samog gateway-a
+   (`404`, `502`, `504`, kasnije `401`) prave se na jednom mestu
+   (`internal/apierror`). Greška servisa `4xx` sa JSON telom prolazi
+   neizmenjena; `4xx` bez JSON-a (npr. `404 page not found` iz `net/http`)
+   dobija opštu poruku za taj status, a telo svake `5xx` greške servisa se
+   zamenjuje opštom porukom, da interni detalji ne bi stigli do klijenta.
+8. **CORS** samo za origin-e iz `CORS_ALLOWED_ORIGINS` (podrazumevano
+   `http://localhost:3000`), nikad `*`. Preflight (`OPTIONS`) odgovara `204`
+   sa dozvoljenim metodama (`GET, POST, PATCH, DELETE`) i headerima
+   (`Authorization, Content-Type`); preflight sa nepoznatog origin-a dobija
+   `403`. Token ide u headeru `Authorization`, pa kolačići i
+   `Access-Control-Allow-Credentials` nisu potrebni.
 
 *Planirano / predlog za IB (SC):* ograničenje broja zahteva na `/api/auth/*`
 (zaštita od pogađanja lozinke i OTP-a) i odbijanje tokena izdatih pre

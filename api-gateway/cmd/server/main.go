@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/routes"
 )
@@ -42,7 +43,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           mux,
+		Handler:           cors.Middleware(cfg.CORSAllowedOrigins, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
@@ -54,7 +55,8 @@ func main() {
 			"upstream_timeout", cfg.UpstreamTimeout.String(),
 			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
 			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
-			"analytics", cfg.AnalyticsURL.Host)
+			"analytics", cfg.AnalyticsURL.Host,
+			"cors_origins", cfg.CORSAllowedOrigins)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)

@@ -123,7 +123,7 @@ func TestUnknownAndInternalRoutesReturn404(t *testing.T) {
 			if len(*hits) != 0 {
 				t.Errorf("zahtev stigao do servisa: %+v", *hits)
 			}
-			if body := rec.Body.String(); body != `{"error":"not found"}` {
+			if body := rec.Body.String(); body != "{\"error\":\"not found\"}\n" {
 				t.Errorf("telo = %q", body)
 			}
 		})

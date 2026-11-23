@@ -152,3 +152,60 @@ func TestUpstreamErrorStatusIsPassedThrough(t *testing.T) {
 		t.Errorf("poruka = %q", msg)
 	}
 }
+
+func TestPlainTextErrorBecomesJSON(t *testing.T) {
+	// net/http za nepoznatu rutu vraca "404 page not found" kao tekst.
+	upstream := httptest.NewServer(http.NotFoundHandler())
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/notifications", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, ocekivano 404", rec.Code)
+	}
+	if msg := errorBody(t, rec); msg != "not found" {
+		t.Errorf("poruka = %q", msg)
+	}
+}
+
+func TestServerErrorDetailsAreHidden(t *testing.T) {
+	for _, ct := range []string{"application/json", "text/plain"} {
+		t.Run(ct, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", ct)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"mongo: connection refused at 10.0.0.5"}`))
+			}))
+			defer upstream.Close()
+
+			h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/folders/x", nil))
+
+			if rec.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, ocekivano 500", rec.Code)
+			}
+			if msg := errorBody(t, rec); msg != "internal error" {
+				t.Errorf("poruka = %q, detalji servisa ne smeju do klijenta", msg)
+			}
+		})
+	}
+}
+
+func TestSuccessBodyIsUntouched(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("sadrzaj datoteke"))
+	}))
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/files/x/content", nil))
+
+	if rec.Code != http.StatusOK || rec.Body.String() != "sadrzaj datoteke" {
+		t.Errorf("status = %d, telo = %q", rec.Code, rec.Body.String())
+	}
+}
