@@ -37,6 +37,9 @@ func TestDefaults(t *testing.T) {
 	if cfg.JWTSecret != testSecret || cfg.AuthTimeout != 5*time.Second {
 		t.Errorf("auth timeout=%v", cfg.AuthTimeout)
 	}
+	if cfg.ReadHeaderTimeout != 5*time.Second || cfg.IdleTimeout != 60*time.Second {
+		t.Errorf("read header=%v idle=%v", cfg.ReadHeaderTimeout, cfg.IdleTimeout)
+	}
 }
 
 func TestJWTSecretRequired(t *testing.T) {
@@ -104,6 +107,29 @@ func TestInvalidServiceURL(t *testing.T) {
 			}
 			if strings.Contains(err.Error(), "p@") {
 				t.Errorf("greska otkriva vrednost: %v", err)
+			}
+		})
+	}
+}
+
+func TestServerTimeoutsFromEnv(t *testing.T) {
+	t.Setenv("GATEWAY_READ_HEADER_TIMEOUT", "2s")
+	t.Setenv("GATEWAY_IDLE_TIMEOUT", "2m")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.ReadHeaderTimeout != 2*time.Second || cfg.IdleTimeout != 2*time.Minute {
+		t.Errorf("read header=%v idle=%v", cfg.ReadHeaderTimeout, cfg.IdleTimeout)
+	}
+}
+
+func TestInvalidServerTimeout(t *testing.T) {
+	for _, k := range []string{"GATEWAY_READ_HEADER_TIMEOUT", "GATEWAY_IDLE_TIMEOUT"} {
+		t.Run(k, func(t *testing.T) {
+			t.Setenv(k, "0s")
+			if _, err := Load(); err == nil {
+				t.Fatal("ocekivana greska za nepozitivan timeout")
 			}
 		})
 	}
