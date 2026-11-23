@@ -860,8 +860,12 @@ servisa (S2).
 4. **Interne rute se ne izlažu.** Ništa sa `/internal/...` nije dostupno kroz
    gateway, ni slučajno: gateway ima eksplicitnu listu ruta iz 5.2 i za sve
    ostalo vraća `404`.
-5. **Timeout ka servisima** (`GATEWAY_UPSTREAM_TIMEOUT`); za otpremanje i
-   preuzimanje duži, jer zavisi od veličine datoteke. Ako servis ne odgovori:
+5. **Timeout ka servisima** (`GATEWAY_UPSTREAM_TIMEOUT`): najduže čekanje da
+   servis počne da odgovara. Ne ograničava prenos tela, pa otpremanje i
+   preuzimanje velike datoteke nisu prekinuti; gateway server zato nema
+   `ReadTimeout`/`WriteTimeout`, a trajanje prenosa ograničava sam servis.
+   Od sporih klijenata štite `GATEWAY_READ_HEADER_TIMEOUT` (zaglavlja) i
+   `GATEWAY_IDLE_TIMEOUT` (neaktivna veza). Ako servis ne odgovori:
    `502`/`504` sa opštom porukom, bez internih detalja.
 6. **Adrese servisa** samo iz env promenljivih (`USERS_SERVICE_URL`,
    `FILES_SERVICE_URL`, ...).

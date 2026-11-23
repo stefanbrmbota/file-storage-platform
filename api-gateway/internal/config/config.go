@@ -20,6 +20,13 @@ type Config struct {
 	// UpstreamTimeout je najduze vreme cekanja odgovora servisa (design 5.3, tacka 5).
 	UpstreamTimeout time.Duration
 
+	// ReadHeaderTimeout je rok da klijent posalje zaglavlja zahteva, a
+	// IdleTimeout koliko neaktivna keep-alive veza ostaje otvorena (T-30.6).
+	// Ukupno trajanje zahteva nije ograniceno, da se ne bi prekidao prenos
+	// velikih datoteka.
+	ReadHeaderTimeout time.Duration
+	IdleTimeout       time.Duration
+
 	// Adrese servisa u internoj mrezi (design 5.3, tacka 6).
 	UsersURL         *url.URL
 	FilesURL         *url.URL
@@ -46,10 +53,12 @@ const MinJWTSecretLen = 32
 func Load() (Config, error) {
 	env := envconfig.New()
 	cfg := Config{
-		Port:            env.String("GATEWAY_PORT", "8080"),
-		UpstreamTimeout: env.Duration("GATEWAY_UPSTREAM_TIMEOUT", 10*time.Second),
-		JWTSecret:       env.Required("JWT_SECRET"),
-		AuthTimeout:     env.Duration("GATEWAY_AUTH_TIMEOUT", 5*time.Second),
+		Port:              env.String("GATEWAY_PORT", "8080"),
+		UpstreamTimeout:   env.Duration("GATEWAY_UPSTREAM_TIMEOUT", 10*time.Second),
+		ReadHeaderTimeout: env.Duration("GATEWAY_READ_HEADER_TIMEOUT", 5*time.Second),
+		IdleTimeout:       env.Duration("GATEWAY_IDLE_TIMEOUT", 60*time.Second),
+		JWTSecret:         env.Required("JWT_SECRET"),
+		AuthTimeout:       env.Duration("GATEWAY_AUTH_TIMEOUT", 5*time.Second),
 	}
 
 	var errs []error

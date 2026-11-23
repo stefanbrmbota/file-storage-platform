@@ -43,19 +43,14 @@ func main() {
 		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
 	}, auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger))
 
-	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           cors.Middleware(cfg.CORSAllowedOrigins, mux),
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	srv := newServer(cfg, cors.Middleware(cfg.CORSAllowedOrigins, mux))
 
 	go func() {
 		logger.Info("gateway service started", "port", cfg.Port,
 			"upstream_timeout", cfg.UpstreamTimeout.String(),
 			"auth_timeout", cfg.AuthTimeout.String(),
+			"read_header_timeout", cfg.ReadHeaderTimeout.String(),
+			"idle_timeout", cfg.IdleTimeout.String(),
 			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
 			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
 			"analytics", cfg.AnalyticsURL.Host,
