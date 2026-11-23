@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/auth"
 )
 
 func discardLogger() *slog.Logger {
@@ -207,5 +210,25 @@ func TestSuccessBodyIsUntouched(t *testing.T) {
 
 	if rec.Code != http.StatusOK || rec.Body.String() != "sadrzaj datoteke" {
 		t.Errorf("status = %d, telo = %q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestIdentityFromAuthIsForwarded(t *testing.T) {
+	var gotID, gotRole string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotID, gotRole = r.Header.Get(HeaderUserID), r.Header.Get(HeaderUserRole)
+	}))
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	req := httptest.NewRequest(http.MethodGet, "/folders/x/contents", nil)
+	// Klijent pokusava da podmetne tudji identitet; vazi samo onaj iz tokena.
+	req.Header.Set(HeaderUserID, "tudji-id")
+	req.Header.Set(HeaderUserRole, "ADMIN")
+	req = req.WithContext(auth.ContextWithIdentity(context.Background(), auth.Identity{UserID: "u1", Role: "USER"}))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	if gotID != "u1" || gotRole != "USER" {
+		t.Errorf("servis dobio %s=%q, %s=%q", HeaderUserID, gotID, HeaderUserRole, gotRole)
 	}
 }

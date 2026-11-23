@@ -30,7 +30,16 @@ type Config struct {
 	// CORSAllowedOrigins su origin-i klijentske aplikacije kojima pretrazivac
 	// sme da salje zahteve (T-30.3), npr. http://localhost:3000.
 	CORSAllowedOrigins []string
+
+	// JWTSecret je ista tajna kao JWT_SECRET u Users servisu (HS256, T-30.5).
+	// Nikad se ne loguje.
+	JWTSecret string
+	// AuthTimeout je najduze cekanje na Users servis pri proveri opozvanog tokena.
+	AuthTimeout time.Duration
 }
+
+// MinJWTSecretLen je najmanja duzina tajne (HS256 trazi bar 256 bita), ista kao u Users servisu.
+const MinJWTSecretLen = 32
 
 // Load cita konfiguraciju; vraca gresku ako neka vrednost nije ispravna.
 // Podrazumevane adrese su iste kao u .env.example (lokalni rad bez Docker-a).
@@ -39,6 +48,8 @@ func Load() (Config, error) {
 	cfg := Config{
 		Port:            env.String("GATEWAY_PORT", "8080"),
 		UpstreamTimeout: env.Duration("GATEWAY_UPSTREAM_TIMEOUT", 10*time.Second),
+		JWTSecret:       env.Required("JWT_SECRET"),
+		AuthTimeout:     env.Duration("GATEWAY_AUTH_TIMEOUT", 5*time.Second),
 	}
 
 	var errs []error
@@ -61,6 +72,10 @@ func Load() (Config, error) {
 			errs = append(errs, errors.New("config: CORS_ALLOWED_ORIGINS mora biti lista adresa oblika http://host:port, bez *"))
 			break
 		}
+	}
+
+	if cfg.JWTSecret != "" && len(cfg.JWTSecret) < MinJWTSecretLen {
+		errs = append(errs, fmt.Errorf("config: JWT_SECRET mora imati bar %d karaktera", MinJWTSecretLen))
 	}
 
 	if err := errors.Join(append([]error{env.Err()}, errs...)...); err != nil {

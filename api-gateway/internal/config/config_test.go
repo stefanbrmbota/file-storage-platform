@@ -1,10 +1,19 @@
 package config
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
 )
+
+const testSecret = "test-secret-test-secret-test-secret-123"
+
+// TestMain postavlja obaveznu tajnu za sve testove; pojedinacni testovi je menjaju preko t.Setenv.
+func TestMain(m *testing.M) {
+	_ = os.Setenv("JWT_SECRET", testSecret)
+	os.Exit(m.Run())
+}
 
 func TestDefaults(t *testing.T) {
 	for _, k := range []string{"GATEWAY_PORT", "GATEWAY_UPSTREAM_TIMEOUT", "USERS_SERVICE_URL",
@@ -24,6 +33,28 @@ func TestDefaults(t *testing.T) {
 	}
 	if len(cfg.CORSAllowedOrigins) != 1 || cfg.CORSAllowedOrigins[0] != "http://localhost:3000" {
 		t.Errorf("cors=%v", cfg.CORSAllowedOrigins)
+	}
+	if cfg.JWTSecret != testSecret || cfg.AuthTimeout != 5*time.Second {
+		t.Errorf("auth timeout=%v", cfg.AuthTimeout)
+	}
+}
+
+func TestJWTSecretRequired(t *testing.T) {
+	t.Setenv("JWT_SECRET", "")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Fatalf("ocekivana greska za JWT_SECRET, dobijeno %v", err)
+	}
+}
+
+func TestJWTSecretTooShort(t *testing.T) {
+	t.Setenv("JWT_SECRET", "kratka-tajna")
+	_, err := Load()
+	if err == nil || !strings.Contains(err.Error(), "JWT_SECRET") {
+		t.Fatalf("ocekivana greska za JWT_SECRET, dobijeno %v", err)
+	}
+	if strings.Contains(err.Error(), "kratka-tajna") {
+		t.Errorf("greska otkriva tajnu: %v", err)
 	}
 }
 

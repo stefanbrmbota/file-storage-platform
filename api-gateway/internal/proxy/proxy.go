@@ -21,10 +21,12 @@ import (
 	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/apierror"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/auth"
 )
 
 // Headeri identiteta koje postavlja samo gateway iz JWT-a (design 5.3, tacka 2).
-// Ako ih klijent posalje, brisu se, da ne bi mogao da se predstavi kao drugi korisnik.
+// Ako ih klijent posalje, brisu se, da ne bi mogao da se predstavi kao drugi
+// korisnik; na zasticenim rutama se zatim postavljaju iz proverenog tokena.
 const (
 	HeaderUserID   = "X-User-ID"
 	HeaderUserRole = "X-User-Role"
@@ -55,6 +57,11 @@ func New(target *url.URL, timeout time.Duration, logger *slog.Logger) http.Handl
 			pr.SetXForwarded()
 			pr.Out.Header.Del(HeaderUserID)
 			pr.Out.Header.Del(HeaderUserRole)
+			// Identitet samo iz tokena koji je proverio auth (T-30.5).
+			if id, ok := auth.FromContext(pr.In.Context()); ok {
+				pr.Out.Header.Set(HeaderUserID, id.UserID)
+				pr.Out.Header.Set(HeaderUserRole, id.Role)
+			}
 		},
 		Transport:      transport,
 		ModifyResponse: normalizeError(target.Host, logger),

@@ -25,11 +25,24 @@ const (
 	Analytics     Service = "analytics"
 )
 
-// Route je jedna spoljna ruta: obrazac za http.ServeMux ("METODA /api/...")
-// i servis kome se prosledjuje.
+// Access je ko sme da pozove rutu (design 5.2, kolona JWT).
+type Access int
+
+const (
+	// User: potreban ispravan, neopozvan token (podrazumevano).
+	User Access = iota
+	// Public: bez tokena (prijava, registracija, potvrda).
+	Public
+	// Admin: token sa ulogom ADMIN.
+	Admin
+)
+
+// Route je jedna spoljna ruta: obrazac za http.ServeMux ("METODA /api/..."),
+// servis kome se prosledjuje i ko sme da je pozove.
 type Route struct {
 	Pattern string
 	Service Service
+	Access  Access
 }
 
 // Prefiksi koji se uklanjaju pre prosledjivanja; prvi koji odgovara se primenjuje.
@@ -45,54 +58,74 @@ const (
 // Nova spoljna ruta se dodaje ovde i u design 5.2. Rute /internal/... se
 // nikad ne dodaju.
 var All = []Route{
-	// Users: autentifikacija (bez JWT-a, T-30.5).
-	{"POST /api/auth/register", Users},
-	{"POST /api/auth/confirm", Users},
-	{"POST /api/auth/login", Users},
-	{"POST /api/auth/login/verify", Users},
-	// Users: nalog i admin (ADMIN uloga se proverava u T-30.5 i u servisu).
-	{"GET /api/users/me", Users},
-	{"GET /api/admin/users", Users},
+	// Users: autentifikacija. Jedine javne rute.
+	{"POST /api/auth/register", Users, Public},
+	{"POST /api/auth/confirm", Users, Public},
+	{"POST /api/auth/login", Users, Public},
+	{"POST /api/auth/login/verify", Users, Public},
+	// Odjava: token mora biti ispravan; Users ga opoziva (US-30, T-30.5).
+	{"POST /api/auth/logout", Users, User},
+	// Users: nalog i admin (ADMIN uloga se proverava i u servisu).
+	{"GET /api/users/me", Users, User},
+	{"GET /api/admin/users", Users, Admin},
 
 	// Files: folderi, datoteke, pretraga.
-	{"POST /api/folders", Files},
-	{"GET /api/folders/{id}/contents", Files},
-	{"PATCH /api/folders/{id}", Files},
-	{"DELETE /api/folders/{id}", Files},
-	{"POST /api/folders/{id}/files", Files},
-	{"GET /api/files/{id}/content", Files},
-	{"PATCH /api/files/{id}", Files},
-	{"DELETE /api/files/{id}", Files},
-	{"GET /api/search", Files},
+	{"POST /api/folders", Files, User},
+	{"GET /api/folders/{id}/contents", Files, User},
+	{"PATCH /api/folders/{id}", Files, User},
+	{"DELETE /api/folders/{id}", Files, User},
+	{"POST /api/folders/{id}/files", Files, User},
+	{"GET /api/files/{id}/content", Files, User},
+	{"PATCH /api/files/{id}", Files, User},
+	{"DELETE /api/files/{id}", Files, User},
+	{"GET /api/search", Files, User},
 
 	// Sharing.
-	{"POST /api/shares", Sharing},
-	{"DELETE /api/shares/{resourceId}/{granteeId}", Sharing},
-	{"GET /api/shares/with-me", Sharing},
-	{"GET /api/shares/{resourceId}", Sharing},
+	{"POST /api/shares", Sharing, User},
+	{"DELETE /api/shares/{resourceId}/{granteeId}", Sharing, User},
+	{"GET /api/shares/with-me", Sharing, User},
+	{"GET /api/shares/{resourceId}", Sharing, User},
 
 	// Notifications.
-	{"GET /api/notifications", Notifications},
-	{"GET /api/notifications/unread-count", Notifications},
-	{"POST /api/notifications/{id}/read", Notifications},
-	{"POST /api/notifications/read-all", Notifications},
+	{"GET /api/notifications", Notifications, User},
+	{"GET /api/notifications/unread-count", Notifications, User},
+	{"POST /api/notifications/{id}/read", Notifications, User},
+	{"POST /api/notifications/read-all", Notifications, User},
 
 	// Analytics.
-	{"GET /api/analytics/me", Analytics},
-	{"GET /api/analytics/me/events", Analytics},
+	{"GET /api/analytics/me", Analytics, User},
+	{"GET /api/analytics/me/events", Analytics, User},
+}
+
+// Guard obavija handler proverom pristupa (auth.Authenticator).
+type Guard interface {
+	Require(http.Handler) http.Handler
+	RequireAdmin(http.Handler) http.Handler
 }
 
 // Register registruje sve rute na mux, i 404 za svaku putanju koja nije na
 // listi. upstreams za svaki servis daje handler koji prosledjuje zahtev
-// (proxy.New); servis bez handlera je greska u konfiguraciji i izaziva panic
-// pri pokretanju.
-func Register(mux *http.ServeMux, upstreams map[Service]http.Handler) {
+// (proxy.New), a guard proverava token na rutama koje nisu javne. Servis bez
+// handlera ili nil guard je greska u konfiguraciji i izaziva panic pri
+// pokretanju.
+func Register(mux *http.ServeMux, upstreams map[Service]http.Handler, guard Guard) {
+	if guard == nil {
+		panic("routes: guard je obavezan")
+	}
 	for _, rt := range All {
 		h, ok := upstreams[rt.Service]
 		if !ok || h == nil {
 			panic("routes: nema handlera za servis " + string(rt.Service))
 		}
-		mux.Handle(rt.Pattern, stripPrefix(h))
+		h = stripPrefix(h)
+		switch rt.Access {
+		case Public:
+		case Admin:
+			h = guard.RequireAdmin(h)
+		default:
+			h = guard.Require(h)
+		}
+		mux.Handle(rt.Pattern, h)
 	}
 	// 404 i za pogresnu metodu postojece putanje, bez otkrivanja koje rute postoje.
 	mux.HandleFunc("/", apierror.NotFound)

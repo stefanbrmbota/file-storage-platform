@@ -806,6 +806,7 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `POST /api/auth/confirm` | Users | ne | US-04 | Potvrda registracije tokenom iz linka (token u telu zahteva, ne u URL-u). |
 | `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. |
 | `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
+| `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
 | `GET /api/folders/{id}/contents` | Files | da | US-03 | Sadržaj foldera (podfolderi i datoteke). |
 
@@ -844,7 +845,10 @@ servisa (S2).
 
 1. **Provera JWT-a.** Token dolazi u `Authorization: Bearer <token>`. Gateway
    proverava potpis (HS256, ista tajna `JWT_SECRET` kao u Users servisu) i rok
-   važenja (`exp`). Neispravan ili istekao token → `401 {"error": "unauthorized"}`.
+   važenja (`exp`), i da token ima `sub`, `role` i `jti`. Zatim pita Users
+   servis da li je token opozvan odjavom (S6). Neispravan, istekao ili opozvan
+   token → `401 {"error": "unauthorized"}`; ako Users ne odgovori → `503`.
+   Bez tokena rade samo `register`, `confirm`, `login` i `login/verify`.
 2. **Identitet ka servisima.** Gateway **briše** `X-User-ID` i `X-User-Role`
    ako ih je klijent poslao, pa ih postavlja iz tokena (`sub` → `X-User-ID`,
    `role` → `X-User-Role`). Servisi veruju samo ovim headerima i nikad ne
@@ -891,6 +895,7 @@ Interne rute počinju sa `/internal/` i dostupne su samo u internoj mreži.
 | S3 | Files → Users | `POST /internal/users/{id}/quota/reserve` `{bytes}` i `.../quota/release` `{bytes}` | Otpremanje i brisanje datoteke | Upload ne sme početi ako nema mesta; rezervacija mora biti atomična (`usedBytes + bytes ≤ quotaBytes` u jednom `UpdateOne`). | `FILES_REQUEST_TIMEOUT` (5s) | Upload se odbija (`503`). Neuspelo oslobađanje se ponavlja (saga, 5.6). | planirano |
 | S4 | Sharing → Users | `POST /internal/users/lookup` `{email}` → `{id, active}` | Deljenje sa korisnikom zadatim mejlom | Bez ID-ja primaoca deljenje ne može da se upiše. | `SHARING_REQUEST_TIMEOUT` (5s) | Deljenje se odbija (`503`). | planirano |
 | S5 | Analytics → Files | `GET /internal/files/{id}/owner` → `{ownerId}` | Statistika preuzimanja jedne datoteke (A4) | Samo vlasnik sme da vidi statistiku; Analytics ne zna vlasnika. | `ANALYTICS_REQUEST_TIMEOUT` (5s) | Zahtev se odbija (`503`). | planirano |
+| S6 | Gateway → Users | `POST /internal/tokens/check` `{jti}` → `{revoked}` | Svaki zahtev na zaštićenoj ruti, posle provere potpisa i roka tokena | Odjavljen token mora odmah prestati da važi, a gateway ne zna za odjave. | `GATEWAY_AUTH_TIMEOUT` (5s) | **Odbija se** (`503`): bez potvrde da token nije opozvan nema pristupa (fail closed). | implementirano |
 
 Napomene:
 - S4 šalje mejl u **telu** `POST` zahteva, ne u URL-u, jer URL-ovi završavaju u

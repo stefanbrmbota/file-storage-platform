@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/auth"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
@@ -32,14 +33,15 @@ func main() {
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
 	// Eksplicitna lista ruta (design 5.2); sve ostalo, ukljucujuci
-	// /internal/..., vraca 404 (design 5.3, tacka 4).
+	// /internal/..., vraca 404 (design 5.3, tacka 4). Rute koje nisu javne
+	// traze ispravan, neopozvan JWT (T-30.5).
 	routes.Register(mux, map[routes.Service]http.Handler{
 		routes.Users:         proxy.New(cfg.UsersURL, cfg.UpstreamTimeout, logger),
 		routes.Files:         proxy.New(cfg.FilesURL, cfg.UpstreamTimeout, logger),
 		routes.Sharing:       proxy.New(cfg.SharingURL, cfg.UpstreamTimeout, logger),
 		routes.Notifications: proxy.New(cfg.NotificationsURL, cfg.UpstreamTimeout, logger),
 		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
-	})
+	}, auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -53,6 +55,7 @@ func main() {
 	go func() {
 		logger.Info("gateway service started", "port", cfg.Port,
 			"upstream_timeout", cfg.UpstreamTimeout.String(),
+			"auth_timeout", cfg.AuthTimeout.String(),
 			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
 			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
 			"analytics", cfg.AnalyticsURL.Host,
