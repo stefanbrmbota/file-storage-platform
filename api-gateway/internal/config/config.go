@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
 	"github.com/stefanbrmbota/file-storage-platform/pkg/envconfig"
 )
 
@@ -24,6 +26,10 @@ type Config struct {
 	NotificationsURL *url.URL
 	SharingURL       *url.URL
 	AnalyticsURL     *url.URL
+
+	// CORSAllowedOrigins su origin-i klijentske aplikacije kojima pretrazivac
+	// sme da salje zahteve (T-30.3), npr. http://localhost:3000.
+	CORSAllowedOrigins []string
 }
 
 // Load cita konfiguraciju; vraca gresku ako neka vrednost nije ispravna.
@@ -49,6 +55,14 @@ func Load() (Config, error) {
 	cfg.SharingURL = parse("SHARING_SERVICE_URL", "http://localhost:8084")
 	cfg.AnalyticsURL = parse("ANALYTICS_SERVICE_URL", "http://localhost:8085")
 
+	cfg.CORSAllowedOrigins = cors.ParseOrigins(env.String("CORS_ALLOWED_ORIGINS", "http://localhost:3000"))
+	for _, o := range cfg.CORSAllowedOrigins {
+		if !validOrigin(o) {
+			errs = append(errs, errors.New("config: CORS_ALLOWED_ORIGINS mora biti lista adresa oblika http://host:port, bez *"))
+			break
+		}
+	}
+
 	if err := errors.Join(append([]error{env.Err()}, errs...)...); err != nil {
 		return Config{}, err
 	}
@@ -65,4 +79,11 @@ func parseServiceURL(key, raw string) (*url.URL, error) {
 	}
 	u.Path = ""
 	return u, nil
+}
+
+// validOrigin prihvata origin oblika scheme://host[:port], bez putanje i bez "*".
+func validOrigin(o string) bool {
+	u, err := url.Parse(o)
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" &&
+		u.Path == "" && u.RawQuery == "" && u.User == nil && !strings.Contains(o, "*")
 }

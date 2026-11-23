@@ -10,6 +10,8 @@ package routes
 import (
 	"net/http"
 	"strings"
+
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/apierror"
 )
 
 // Service oznacava ciljni servis rute.
@@ -92,15 +94,8 @@ func Register(mux *http.ServeMux, upstreams map[Service]http.Handler) {
 		}
 		mux.Handle(rt.Pattern, stripPrefix(h))
 	}
-	mux.HandleFunc("/", notFound)
-}
-
-// notFound odgovara na sve sto nije na listi, ukljucujuci pogresnu metodu
-// za postojecu putanju, bez otkrivanja koje rute postoje.
-func notFound(w http.ResponseWriter, _ *http.Request) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusNotFound)
-	_, _ = w.Write([]byte(`{"error":"not found"}`))
+	// 404 i za pogresnu metodu postojece putanje, bez otkrivanja koje rute postoje.
+	mux.HandleFunc("/", apierror.NotFound)
 }
 
 // stripPrefix uklanja /api/auth ili /api sa pocetka putanje i prosledjuje

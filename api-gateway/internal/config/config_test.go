@@ -8,7 +8,8 @@ import (
 
 func TestDefaults(t *testing.T) {
 	for _, k := range []string{"GATEWAY_PORT", "GATEWAY_UPSTREAM_TIMEOUT", "USERS_SERVICE_URL",
-		"FILES_SERVICE_URL", "NOTIFICATIONS_SERVICE_URL", "SHARING_SERVICE_URL", "ANALYTICS_SERVICE_URL"} {
+		"FILES_SERVICE_URL", "NOTIFICATIONS_SERVICE_URL", "SHARING_SERVICE_URL", "ANALYTICS_SERVICE_URL",
+		"CORS_ALLOWED_ORIGINS"} {
 		t.Setenv(k, "")
 	}
 	cfg, err := Load()
@@ -20,6 +21,31 @@ func TestDefaults(t *testing.T) {
 	}
 	if cfg.UsersURL.String() != "http://localhost:8081" || cfg.AnalyticsURL.String() != "http://localhost:8085" {
 		t.Errorf("users=%s analytics=%s", cfg.UsersURL, cfg.AnalyticsURL)
+	}
+	if len(cfg.CORSAllowedOrigins) != 1 || cfg.CORSAllowedOrigins[0] != "http://localhost:3000" {
+		t.Errorf("cors=%v", cfg.CORSAllowedOrigins)
+	}
+}
+
+func TestCORSOrigins(t *testing.T) {
+	t.Setenv("CORS_ALLOWED_ORIGINS", "http://localhost:3000, https://app.example.com/")
+	cfg, err := Load()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(cfg.CORSAllowedOrigins) != 2 || cfg.CORSAllowedOrigins[1] != "https://app.example.com" {
+		t.Errorf("cors=%v", cfg.CORSAllowedOrigins)
+	}
+}
+
+func TestInvalidCORSOrigin(t *testing.T) {
+	for _, raw := range []string{"*", "localhost:3000", "http://localhost:3000/app", "https://*.example.com"} {
+		t.Run(raw, func(t *testing.T) {
+			t.Setenv("CORS_ALLOWED_ORIGINS", raw)
+			if _, err := Load(); err == nil {
+				t.Fatal("ocekivana greska")
+			}
+		})
 	}
 }
 
