@@ -73,6 +73,7 @@ services:
       SMTP_PORT: "1025"
       FILES_SERVICE_URL: http://files:8082
       JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-at-least-32-chars}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me-internal-token-at-least-32-chars}
     expose: ["8081"]
     healthcheck: { <<: *go-health, test: ["CMD", "/app/healthcheck", "8081"] }
     depends_on:
@@ -93,6 +94,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-change-me}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-change-me-minio}
       USERS_SERVICE_URL: http://users:8081
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me-internal-token-at-least-32-chars}
     expose: ["8082"]
     healthcheck: { <<: *go-health, test: ["CMD", "/app/healthcheck", "8082"] }
     depends_on:

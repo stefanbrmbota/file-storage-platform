@@ -65,16 +65,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	users := client.NewUsersClient(cfg.UsersServiceURL, cfg.RequestTimeout)
+	if cfg.InternalToken == "" {
+		logger.Warn("INTERNAL_TOKEN is not set: the Users service will refuse quota calls and uploads will fail")
+	}
+	users := client.NewUsersClient(cfg.UsersServiceURL, cfg.InternalToken, cfg.RequestTimeout)
 	files := service.NewFileService(folders, fileRepo, objects, users)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           handler.New(folders, files, cfg.MaxUploadBytes).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
-		// Uploads can be large, so reading the request may take a while.
+		// Uploads (and later downloads) of big files take time. WriteTimeout
+		// counts from the end of the request headers to the end of the
+		// response, so it must cover the whole upload, not only the reply.
 		ReadTimeout:  5 * time.Minute,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 5 * time.Minute,
 		IdleTimeout:  60 * time.Second,
 	}
 

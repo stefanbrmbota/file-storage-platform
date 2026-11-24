@@ -20,9 +20,17 @@ type fakeUsers struct {
 	lastBytes int64
 }
 
+const testToken = "test-internal-token-at-least-32-chars"
+
 func (f *fakeUsers) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+
+	// Like the real Users service: no valid internal token, no access.
+	if r.Header.Get(InternalTokenHeader) != testToken {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
 
 	var body struct{ Bytes int64 }
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -51,7 +59,7 @@ func TestReserveAndRelease(t *testing.T) {
 	users := &fakeUsers{free: 100}
 	srv := httptest.NewServer(users)
 	defer srv.Close()
-	c := NewUsersClient(srv.URL, time.Second)
+	c := NewUsersClient(srv.URL, testToken, time.Second)
 	ctx := context.Background()
 
 	if err := c.Reserve(ctx, "ana", 60); err != nil {
@@ -73,19 +81,29 @@ func TestReserveAndRelease(t *testing.T) {
 	}
 }
 
+func TestWrongInternalTokenIsRefused(t *testing.T) {
+	srv := httptest.NewServer(&fakeUsers{free: 100})
+	defer srv.Close()
+
+	err := NewUsersClient(srv.URL, "pogresan-token", time.Second).Reserve(context.Background(), "ana", 1)
+	if !errors.Is(err, ErrUsersUnavailable) {
+		t.Fatalf("wrong token: err = %v, want ErrUsersUnavailable", err)
+	}
+}
+
 func TestUsersServiceDown(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer srv.Close()
 
-	err := NewUsersClient(srv.URL, time.Second).Reserve(context.Background(), "ana", 1)
+	err := NewUsersClient(srv.URL, testToken, time.Second).Reserve(context.Background(), "ana", 1)
 	if !errors.Is(err, ErrUsersUnavailable) {
 		t.Fatalf("500 from Users: err = %v, want ErrUsersUnavailable", err)
 	}
 
 	srv.Close() // nothing listens on that address any more
-	err = NewUsersClient(srv.URL, time.Second).Reserve(context.Background(), "ana", 1)
+	err = NewUsersClient(srv.URL, testToken, time.Second).Reserve(context.Background(), "ana", 1)
 	if !errors.Is(err, ErrUsersUnavailable) {
 		t.Fatalf("Users not running: err = %v, want ErrUsersUnavailable", err)
 	}
@@ -101,7 +119,7 @@ func TestReserveTimesOut(t *testing.T) {
 	defer slow.Close()
 
 	start := time.Now()
-	err := NewUsersClient(slow.URL, 100*time.Millisecond).Reserve(context.Background(), "ana", 1)
+	err := NewUsersClient(slow.URL, testToken, 100*time.Millisecond).Reserve(context.Background(), "ana", 1)
 	if !errors.Is(err, ErrUsersUnavailable) {
 		t.Fatalf("slow Users: err = %v, want ErrUsersUnavailable", err)
 	}
