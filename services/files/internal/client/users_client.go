@@ -20,24 +20,32 @@ var (
 	ErrUsersUnavailable = errors.New("users service unavailable")
 )
 
+// InternalTokenHeader carries the shared secret that internal endpoints of
+// other services require (same header the Users service checks).
+const InternalTokenHeader = "X-Internal-Token"
+
 // UsersClient calls the internal quota endpoints of the Users service
 // (design 5.4, S3):
 //
 //	POST /internal/users/{id}/quota/reserve  {"bytes": n}  -> 2xx or 409 (no room)
 //	POST /internal/users/{id}/quota/release  {"bytes": n}  -> 2xx
+//
+// Every call sends the internal token; without it the Users service refuses.
 type UsersClient struct {
 	baseURL string
+	token   string
 	http    *http.Client
 	timeout time.Duration
 }
 
 // NewUsersClient returns a client where every call has its own timeout (2.6.2).
-func NewUsersClient(baseURL string, timeout time.Duration) *UsersClient {
+func NewUsersClient(baseURL, internalToken string, timeout time.Duration) *UsersClient {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
 	return &UsersClient{
 		baseURL: baseURL,
+		token:   internalToken,
 		http:    &http.Client{Timeout: timeout},
 		timeout: timeout,
 	}
@@ -70,6 +78,7 @@ func (c *UsersClient) quota(ctx context.Context, userID, action string, n int64)
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(InternalTokenHeader, c.token)
 
 	resp, err := c.http.Do(req)
 	if err != nil {

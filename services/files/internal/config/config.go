@@ -18,6 +18,7 @@ type Config struct {
 	MinioBucket     string
 	MinioUseSSL     bool
 	UsersServiceURL string
+	InternalToken   string // shared secret for internal calls (X-Internal-Token); never logged
 	RequestTimeout  time.Duration
 	MaxUploadBytes  int64
 }
@@ -33,6 +34,7 @@ func Load() Config {
 		MinioBucket:     getEnv("MINIO_BUCKET", "files"),
 		MinioUseSSL:     os.Getenv("MINIO_USE_SSL") == "true",
 		UsersServiceURL: getEnv("USERS_SERVICE_URL", "http://localhost:8081"),
+		InternalToken:   os.Getenv("INTERNAL_TOKEN"),
 		RequestTimeout:  getDuration("FILES_REQUEST_TIMEOUT", 5*time.Second),
 		MaxUploadBytes:  getInt64("FILES_MAX_UPLOAD_BYTES", 100<<20), // 100 MB
 	}
