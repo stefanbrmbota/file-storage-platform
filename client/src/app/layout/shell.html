@@ -16,5 +16,11 @@
 </header>
 
 <main class="content">
+  @if (errors.message(); as message) {
+    <div class="error-banner" role="alert">
+      <span>{{ message }}</span>
+      <button type="button" class="error-banner__close" (click)="errors.dismiss()" aria-label="Zatvori poruku">×</button>
+    </div>
+  }
   <router-outlet />
 </main>
