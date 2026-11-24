@@ -1,0 +1,11 @@
+.status {
+  color: var(--muted);
+}
+
+.status[data-status='dostupan'] {
+  color: var(--success);
+}
+
+.status[data-status='nedostupan'] {
+  color: var(--danger);
+}
