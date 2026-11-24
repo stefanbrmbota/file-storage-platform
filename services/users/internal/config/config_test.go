@@ -132,6 +132,22 @@ func TestLoadJWTSettings(t *testing.T) {
 	})
 }
 
+func TestLoadInternalToken(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Setenv("INTERNAL_TOKEN", "")
+	cfg, err := Load()
+	if err != nil || cfg.InternalToken != "" {
+		t.Fatalf("bez env: %v, %q (nema podrazumevane vrednosti)", err, cfg.InternalToken)
+	}
+	t.Setenv("INTERNAL_TOKEN", "neka-tajna")
+	cfg, err = Load()
+	if err != nil || cfg.InternalToken != "neka-tajna" {
+		t.Fatalf("iz env: %v, %q", err, cfg.InternalToken)
+	}
+}
+
 func TestLoadOTPMaxAttempts(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "")
 	t.Setenv("ADMIN_PASSWORD", "")
