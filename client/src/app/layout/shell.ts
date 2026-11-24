@@ -1,6 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ErrorBannerService } from '../core/notify/error-banner.service';
+import { TokenService } from '../core/auth/token.service';
+import { AuthService } from '../core/auth/auth.service';
 
 /** Stavka glavne navigacije u zaglavlju. */
 export interface NavItem {
@@ -25,4 +27,17 @@ export class Shell {
 
   /** Poruka o gresci na vrhu stranice (T-32.3). */
   protected readonly errors = inject(ErrorBannerService);
+
+  /** Da li je korisnik prijavljen; navigacija i "Odjavi se" samo tada (T-32.4). */
+  protected readonly tokens = inject(TokenService);
+  private readonly auth = inject(AuthService);
+  protected readonly loggingOut = signal(false);
+
+  protected logout(): void {
+    this.loggingOut.set(true);
+    this.auth.logout().subscribe({
+      complete: () => this.loggingOut.set(false),
+      error: () => this.loggingOut.set(false), // token je svakako obrisan lokalno
+    });
+  }
 }

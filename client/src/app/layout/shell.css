@@ -67,3 +67,22 @@
   line-height: 1;
   cursor: pointer;
 }
+
+.logout,
+.login-link {
+  margin-left: auto;
+}
+
+.logout {
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+.logout:disabled {
+  opacity: 0.6;
+}

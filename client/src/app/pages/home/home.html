@@ -1,3 +1,6 @@
 <h1>Dobrodošli</h1>
 <p>Platforma za skladištenje i deljenje fajlova.</p>
+@if (claims(); as c) {
+  <p class="role">Prijavljen si (uloga: {{ c.role === 'ADMIN' ? 'administrator' : 'korisnik' }}).</p>
+}
 <p class="status" [attr.data-status]="gatewayStatus()">Gateway: {{ gatewayStatus() }}</p>
