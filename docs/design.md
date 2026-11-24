@@ -460,10 +460,15 @@ CREATE TABLE IF NOT EXISTS notifications_by_user (
 TTL od 90 dana ograničava veličinu particije: stara obaveštenja se sama brišu,
 pa particija aktivnog korisnika ne raste neograničeno.
 
-Upit N1 (stranice preko `paging state`-a drajvera):
+Upit N1, stranice preko kursora (ID poslednjeg obaveštenja sa prethodne
+stranice):
 ```sql
-SELECT * FROM notifications_by_user WHERE user_id = ? LIMIT 20;
+SELECT * FROM notifications_by_user WHERE user_id = ? LIMIT 20;                            -- prva stranica
+SELECT * FROM notifications_by_user WHERE user_id = ? AND notification_id < ? LIMIT 20;    -- sledeća
 ```
+Kursor je obični `timeuuid`, a ne `paging state` drajvera: klijent ga ne može
+iskoristiti da pročita tuđu particiju (`user_id` uvek dolazi od gateway-a), a
+servis proverava da je ispravan `timeuuid` pre upita.
 
 ### 3.4 Tabela `unread_by_user`
 
