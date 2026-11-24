@@ -8,6 +8,7 @@ import (
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/client"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/model"
@@ -15,7 +16,33 @@ import (
 )
 
 // fakeFiles stores file metadata in memory, with the unique-name rule.
-type fakeFiles struct{ items []*model.File }
+type fakeFiles struct {
+	items      []*model.File
+	failUpdate bool
+}
+
+func (f *fakeFiles) FindByID(_ context.Context, id string) (*model.File, error) {
+	for _, file := range f.items {
+		if file.ID == id {
+			found := *file
+			return &found, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (f *fakeFiles) UpdateContent(_ context.Context, id, key string, size int64, ct, hash string, at time.Time) error {
+	if f.failUpdate {
+		return errors.New("mongo is down")
+	}
+	for _, file := range f.items {
+		if file.ID == id {
+			file.ObjectKey, file.Size, file.ContentType, file.Hash, file.UpdatedAt = key, size, ct, hash, at
+			return nil
+		}
+	}
+	return repository.ErrNotFound
+}
 
 func (f *fakeFiles) Create(_ context.Context, file *model.File) error {
 	for _, other := range f.items {

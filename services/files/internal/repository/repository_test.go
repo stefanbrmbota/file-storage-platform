@@ -111,6 +111,36 @@ func TestFileCreate(t *testing.T) {
 	}
 }
 
+func TestFileUpdateContent(t *testing.T) {
+	ctx := context.Background()
+	repo, err := NewFileRepository(ctx, testDB(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	f := &model.File{ID: "1", Name: "cv.pdf", OwnerID: "ana", ParentID: "root", ObjectKey: "old", Size: 10, ContentType: "application/pdf", Hash: "h1"}
+	if err := repo.Create(ctx, f); err != nil {
+		t.Fatal(err)
+	}
+	later := time.Now().UTC().Truncate(time.Millisecond)
+
+	if err := repo.UpdateContent(ctx, "1", "new", 99, "text/plain", "h2", later); err != nil {
+		t.Fatalf("UpdateContent: %v", err)
+	}
+	got, err := repo.FindByID(ctx, "1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.ObjectKey != "new" || got.Size != 99 || got.ContentType != "text/plain" || got.Hash != "h2" || !got.UpdatedAt.Equal(later) {
+		t.Errorf("content not updated: %+v", got)
+	}
+	if got.Name != "cv.pdf" || got.OwnerID != "ana" || got.ParentID != "root" {
+		t.Errorf("name, owner and folder must stay the same: %+v", got)
+	}
+	if err := repo.UpdateContent(ctx, "missing", "k", 1, "", "", later); !errors.Is(err, ErrNotFound) {
+		t.Errorf("missing file: err = %v, want ErrNotFound", err)
+	}
+}
+
 func TestFileFindAndRename(t *testing.T) {
 	ctx := context.Background()
 	repo, err := NewFileRepository(ctx, testDB(t))

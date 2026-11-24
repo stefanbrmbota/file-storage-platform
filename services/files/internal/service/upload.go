@@ -23,9 +23,11 @@ var (
 	ErrQuotaUnavailable = errors.New("quota check is temporarily unavailable, try again later")
 )
 
-// FileCreator saves file metadata (repository.FileRepository).
-type FileCreator interface {
+// FileWriter saves and changes file metadata (repository.FileRepository).
+type FileWriter interface {
 	Create(ctx context.Context, f *model.File) error
+	FindByID(ctx context.Context, id string) (*model.File, error)
+	UpdateContent(ctx context.Context, id, objectKey string, size int64, contentType, hash string, updatedAt time.Time) error
 }
 
 // ObjectStore keeps file contents (objectstore.Store, MinIO).
@@ -43,13 +45,13 @@ type QuotaClient interface {
 // FileService handles operations on file contents.
 type FileService struct {
 	folders *FolderService
-	files   FileCreator
+	files   FileWriter
 	objects ObjectStore
 	quota   QuotaClient
 	now     func() time.Time
 }
 
-func NewFileService(folders *FolderService, files FileCreator, objects ObjectStore, quota QuotaClient) *FileService {
+func NewFileService(folders *FolderService, files FileWriter, objects ObjectStore, quota QuotaClient) *FileService {
 	return &FileService{folders: folders, files: files, objects: objects, quota: quota, now: time.Now}
 }
 
