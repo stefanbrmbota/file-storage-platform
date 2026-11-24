@@ -20,7 +20,7 @@ func Health(p Pinger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := p.Ping(r.Context()); err != nil {
 			slog.Warn("health: baza nije dostupna", "err", err)
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"error": "service unavailable"})
+			writeError(w, http.StatusServiceUnavailable, "service unavailable")
 			return
 		}
 		writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
