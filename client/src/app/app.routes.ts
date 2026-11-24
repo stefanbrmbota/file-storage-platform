@@ -1,12 +1,14 @@
 import { Routes } from '@angular/router';
 import { Shell } from './layout/shell';
+import { authGuard, guestGuard } from './core/auth/auth.guard';
 
 /**
  * Rute klijenta (T-32.2). Sve stranice su deca rasporeda Shell, pa dobijaju
  * zajednicko zaglavlje i navigaciju. Stranice se ucitavaju tek kad zatrebaju
  * (loadComponent), da pocetno ucitavanje ostane malo.
  *
- * Nova stranica: dodaj child rutu ispred '**' i stavku u Shell.nav.
+ * Nova stranica: dodaj child rutu ispred '**' i stavku u Shell.nav. Stranica
+ * koja trazi prijavu dobija canActivate: [authGuard].
  */
 export const routes: Routes = [
   {
@@ -14,13 +16,16 @@ export const routes: Routes = [
     component: Shell,
     children: [
       {
+        // Zasticena stranica: bez prijave vodi na /prijava (T-32.4).
         path: '',
+        canActivate: [authGuard],
         title: 'Početna | File Storage',
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
       {
-        // Interceptor ovde salje korisnika kad token istekne; formu pravi T-32.4.
+        // Prijava u dva koraka; prijavljen korisnik se vraca na pocetnu.
         path: 'prijava',
+        canActivate: [guestGuard],
         title: 'Prijava | File Storage',
         loadComponent: () => import('./pages/login/login').then((m) => m.Login),
       },

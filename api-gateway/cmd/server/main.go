@@ -35,13 +35,17 @@ func main() {
 	// Eksplicitna lista ruta (design 5.2); sve ostalo, ukljucujuci
 	// /internal/..., vraca 404 (design 5.3, tacka 4). Rute koje nisu javne
 	// traze ispravan, neopozvan JWT (T-30.5).
+	authenticator := auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger)
 	routes.Register(mux, map[routes.Service]http.Handler{
 		routes.Users:         proxy.New(cfg.UsersURL, cfg.UpstreamTimeout, logger),
 		routes.Files:         proxy.New(cfg.FilesURL, cfg.UpstreamTimeout, logger),
 		routes.Sharing:       proxy.New(cfg.SharingURL, cfg.UpstreamTimeout, logger),
 		routes.Notifications: proxy.New(cfg.NotificationsURL, cfg.UpstreamTimeout, logger),
 		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
-	}, auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger))
+	}, authenticator)
+	// Provera da li je sesija klijenta i dalje vazeca (T-32.4): odgovara sam
+	// gateway, posle provere tokena i opoziva.
+	mux.Handle("GET /api/auth/session", authenticator.Require(auth.SessionHandler()))
 
 	srv := newServer(cfg, cors.Middleware(cfg.CORSAllowedOrigins, mux))
 

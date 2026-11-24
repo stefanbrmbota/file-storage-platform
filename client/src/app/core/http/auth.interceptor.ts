@@ -10,6 +10,9 @@ import { apiErrorMessage } from './api-error';
 /** Putanja stranice za prijavu (T-32.4). */
 export const LOGIN_PATH = '/prijava';
 
+/** Provera sesije (GET /api/auth/session), koju zove guard. */
+export const SESSION_PATH = '/api/auth/session';
+
 /**
  * Rute gateway-a gde 401 znaci "pogresni podaci", a ne "token je istekao",
  * pa se korisnik ne salje na prijavu (vec je tamo).
@@ -46,8 +49,11 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (err instanceof HttpErrorResponse) {
         if (err.status === 401 && !PUBLIC_AUTH_PATHS.includes(path)) {
           tokens.clear();
-          const returnUrl = router.url.startsWith(LOGIN_PATH) ? undefined : router.url;
-          void router.navigate([LOGIN_PATH], { queryParams: returnUrl ? { returnUrl } : {} });
+          // Proveru sesije poziva guard, koji sam vodi na prijavu sa pravim returnUrl.
+          if (path !== SESSION_PATH) {
+            const returnUrl = router.url.startsWith(LOGIN_PATH) ? undefined : router.url;
+            void router.navigate([LOGIN_PATH], { queryParams: returnUrl ? { returnUrl } : {} });
+          }
         } else if (err.status === 0 || err.status >= 500) {
           banner.show(apiErrorMessage(err));
         }

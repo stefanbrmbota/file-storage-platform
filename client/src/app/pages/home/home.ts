@@ -1,10 +1,11 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { ConfigService } from '../../core/config.service';
+import { TokenService } from '../../core/auth/token.service';
 
 type GatewayStatus = 'proveravam' | 'dostupan' | 'nedostupan';
 
-/** Pocetna stranica. Za sada prikazuje i da li klijent dopire do gateway-a (T-32.1). */
+/** Pocetna stranica (zasticena). Za sada prikazuje ulogu i da li klijent dopire do gateway-a. */
 @Component({
   selector: 'app-home',
   templateUrl: './home.html',
@@ -15,6 +16,7 @@ export class Home implements OnInit {
   private readonly config = inject(ConfigService);
 
   protected readonly gatewayStatus = signal<GatewayStatus>('proveravam');
+  protected readonly claims = inject(TokenService).claims;
 
   ngOnInit(): void {
     this.http.get<{ status: string }>(`${this.config.gatewayUrl}/health`).subscribe({
