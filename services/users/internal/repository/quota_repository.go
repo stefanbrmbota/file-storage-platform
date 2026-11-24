@@ -22,6 +22,9 @@ type QuotaRepository interface {
 	// ErrNotFound ako korisnik ne postoji, ErrQuotaExceeded ako nema mesta
 	// (usedBytes se tada ne menja).
 	ReserveQuota(ctx context.Context, id string, bytes int64) (remaining int64, err error)
+	// ReleaseQuota atomicno smanjuje usedBytes za bytes, nikad ispod 0.
+	// Vraca usedBytes posle oslobadjanja. ErrNotFound ako korisnik ne postoji.
+	ReleaseQuota(ctx context.Context, id string, bytes int64) (usedBytes int64, err error)
 }
 
 // ReserveQuota je jedan FindOneAndUpdate: uslov i povecanje se izvrsavaju
@@ -50,4 +53,24 @@ func (r *MongoUserRepository) ReserveQuota(ctx context.Context, id string, bytes
 		return 0, ferr
 	}
 	return 0, ErrQuotaExceeded
+}
+
+// ReleaseQuota je jedan FindOneAndUpdate sa pipeline update-om, pa se
+// usedBytes = max(0, usedBytes - bytes) racuna atomicno u bazi.
+func (r *MongoUserRepository) ReleaseQuota(ctx context.Context, id string, bytes int64) (int64, error) {
+	update := mongo.Pipeline{{{Key: "$set", Value: bson.D{{Key: "usedBytes", Value: bson.D{{Key: "$max", Value: bson.A{
+		int64(0),
+		bson.D{{Key: "$subtract", Value: bson.A{"$usedBytes", bytes}}},
+	}}}}}}}}
+	opts := options.FindOneAndUpdate().SetReturnDocument(options.After)
+
+	var u model.User
+	err := r.coll.FindOneAndUpdate(ctx, bson.D{{Key: "_id", Value: id}}, update, opts).Decode(&u)
+	if errors.Is(err, mongo.ErrNoDocuments) {
+		return 0, ErrNotFound
+	}
+	if err != nil {
+		return 0, fmt.Errorf("repository: oslobadjanje kvote: %w", err)
+	}
+	return u.UsedBytes, nil
 }

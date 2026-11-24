@@ -34,9 +34,29 @@ func NewQuotaService(repo repository.QuotaRepository) *QuotaService {
 	return &QuotaService{repo: repo}
 }
 
+func validQuotaRequest(userID string, bytes int64) bool {
+	return strings.TrimSpace(userID) != "" && len(userID) <= maxQuotaUserIDLen && bytes > 0 && bytes <= MaxQuotaRequestBytes
+}
+
+// ReleaseQuota oslobadja bytes u kvoti korisnika (najnize do 0) i vraca novo zauzece.
+func (s *QuotaService) ReleaseQuota(ctx context.Context, userID string, bytes int64) (int64, error) {
+	if !validQuotaRequest(userID, bytes) {
+		return 0, ErrInvalidQuotaRequest
+	}
+	used, err := s.repo.ReleaseQuota(ctx, userID, bytes)
+	switch {
+	case err == nil:
+		return used, nil
+	case errors.Is(err, repository.ErrNotFound):
+		return 0, ErrUserNotFound
+	default:
+		return 0, fmt.Errorf("oslobadjanje kvote: %w", err)
+	}
+}
+
 // ReserveQuota rezervise bytes u kvoti korisnika i vraca preostali prostor.
 func (s *QuotaService) ReserveQuota(ctx context.Context, userID string, bytes int64) (int64, error) {
-	if strings.TrimSpace(userID) == "" || len(userID) > maxQuotaUserIDLen || bytes <= 0 || bytes > MaxQuotaRequestBytes {
+	if !validQuotaRequest(userID, bytes) {
 		return 0, ErrInvalidQuotaRequest
 	}
 	remaining, err := s.repo.ReserveQuota(ctx, userID, bytes)
