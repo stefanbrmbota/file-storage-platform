@@ -71,6 +71,9 @@ func (s *Notifications) List(ctx context.Context, userID, cursor string, limit i
 		return Page{}, err
 	}
 
+	if items == nil {
+		items = []model.Notification{} // klijent uvek dobija niz, ne null
+	}
 	page := Page{Items: items}
 	if len(items) > limit {
 		page.Items = items[:limit]

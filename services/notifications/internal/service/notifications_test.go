@@ -114,7 +114,7 @@ func TestListOnlyOwnNotifications(t *testing.T) {
 
 func TestListEmpty(t *testing.T) {
 	p, err := NewNotifications(&fakeRepo{}).List(context.Background(), "u1", "", 10)
-	if err != nil || len(p.Items) != 0 || p.NextCursor != "" {
+	if err != nil || p.Items == nil || len(p.Items) != 0 || p.NextCursor != "" {
 		t.Fatalf("p = %+v, err = %v", p, err)
 	}
 }

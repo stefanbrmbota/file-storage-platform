@@ -13,6 +13,7 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/handler"
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/repository"
+	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/service"
 )
 
 func main() {
@@ -37,6 +38,12 @@ func main() {
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", handler.Health(store))
+
+	// Obavestenja prijavljenog korisnika (US-07, T-07.3); kroz gateway
+	// /api/notifications, a ID korisnika dolazi u X-User-ID.
+	notifications := service.NewNotifications(store)
+	mux.HandleFunc("GET /notifications", handler.ListNotifications(notifications))
+	mux.HandleFunc("GET /notifications/unread-count", handler.UnreadCount(notifications))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
