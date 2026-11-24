@@ -63,7 +63,7 @@ docker build -f api-gateway/Dockerfile -t fsp-gateway .
 ```
 
 ## Docker Compose (lokalno okruženje, US-33 / T-33.2, vlasnik AP)
-`docker-compose.yml` u root-u podiže gateway, svih 5 servisa, MongoDB, Cassandru, Neo4j, MinIO i MailHog:
+`docker-compose.yml` u root-u podiže klijenta (Angular), gateway, svih 5 servisa, MongoDB, Cassandru, Neo4j, MinIO i MailHog:
 ```
 docker compose up --build -d
 docker compose ps
@@ -73,7 +73,7 @@ docker compose down
 (`docker compose down -v` briše i podatke iz volume-a.)
 
 Pravila kad menjaš servis ili compose:
-- Spolja je dostupan SAMO gateway (`localhost:8080`) i MailHog UI (`127.0.0.1:8025`, samo razvoj). Servisi i baze su u mreži `backend` (`internal: true`) i NE dobijaju `ports:`; ne dodavati ih.
+- Spolja su dostupni SAMO klijent (`localhost:3000`, mreža `public`, ne vidi servise), gateway (`localhost:8080`) i MailHog UI (`127.0.0.1:8025`, samo razvoj). Servisi i baze su u mreži `backend` (`internal: true`) i NE dobijaju `ports:`; ne dodavati ih.
 - U Docker mreži se ide po imenu servisa iz compose-a (`http://users:8081`, `mongo:27017`, `cassandra:9042`, `bolt://neo4j:7687`, `minio:9000`, `mailhog:1025`), ne `localhost`.
 - Konfiguracija servisa: `<servis>/.env.example` pa opciono `<servis>/.env`; `environment:` u compose-u prepisuje samo adrese za Docker mrežu. Nova env promenljiva ide u `.env.example` servisa, a u compose samo ako je adresa drugog kontejnera.
 - Tajne koje deli više kontejnera (`JWT_SECRET`, MinIO, Neo4j) su u root `.env` (šablon `.env.example` u root-u).

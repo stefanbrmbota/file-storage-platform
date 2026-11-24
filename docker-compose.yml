@@ -1,4 +1,4 @@
-# Lokalno radno okruženje (US-33, T-33.2 i T-33.3): gateway, svi servisi i njihove baze.
+# Lokalno radno okruženje (US-33, T-33.2 i T-33.3): klijent, gateway, svi servisi i njihove baze.
 #
 #   docker compose up --build -d     podiže sve
 #   docker compose ps                stanje i healthcheck
@@ -7,8 +7,9 @@
 #   docker compose down -v           gasi i briše podatke
 #
 # Pravila (docs/design.md, odeljak 5):
-# - Spolja je dostupan SAMO gateway (port 8080). Servisi i baze su u internoj
-#   mreži "backend" (internal: true) i nemaju objavljene portove.
+# - Spolja su dostupni SAMO klijent (port 3000) i gateway (port 8080). Servisi i
+#   baze su u internoj mreži "backend" (internal: true) i nemaju objavljene portove;
+#   klijent je samo u mreži "public" i do servisa ide preko gateway-a.
 # - Servisi se međusobno zovu po imenu iz ovog fajla (http://users:8081, mongo:27017...).
 # - Konfiguracija: <servis>/.env.example (obavezno) pa <servis>/.env (opciono,
 #   lokalne izmene); "environment:" ovde prepisuje samo adrese za Docker mrežu.
@@ -57,6 +58,25 @@ services:
       notifications: { condition: service_healthy }
       sharing: { condition: service_healthy }
       analytics: { condition: service_healthy }
+
+  # Klijent (Angular, US-32): statički sajt preko nginx-a. Pretraživač ga
+  # otvara na localhost:3000 i odatle zove gateway (CORS dozvoljava :3000).
+  client:
+    build: { context: client }
+    restart: unless-stopped
+    environment:
+      # Adresa gateway-a kako je vidi pretraživač (ne Docker mreža).
+      GATEWAY_URL: http://localhost:${GATEWAY_PUBLIC_PORT:-8080}
+    ports:
+      - "${CLIENT_PUBLIC_PORT:-3000}:8080"
+    networks: [public]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      gateway: { condition: service_healthy }
 
   # ---- servisi -------------------------------------------------------------
   users:
