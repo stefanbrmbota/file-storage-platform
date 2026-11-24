@@ -119,6 +119,13 @@ func main() {
 	logout := service.NewLogoutService(tokens, revokedRepo)
 	quota := service.NewQuotaService(userRepo)
 
+	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
+	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
+	if err != nil {
+		logger.Error("neispravna konfiguracija (INTERNAL_TOKEN)", "err", err)
+		os.Exit(1)
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("POST /register", handler.RegisterHandler(registration))
 	mux.HandleFunc("POST /login", handler.LoginHandler(login))
@@ -126,8 +133,8 @@ func main() {
 	mux.HandleFunc("POST /confirm", handler.ConfirmHandler(confirmation))
 	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
-	mux.HandleFunc("POST /internal/users/{id}/quota/reserve", handler.ReserveQuotaHandler(quota))
-	mux.HandleFunc("POST /internal/users/{id}/quota/release", handler.ReleaseQuotaHandler(quota))
+	mux.Handle("POST /internal/users/{id}/quota/reserve", internalOnly(handler.ReserveQuotaHandler(quota)))
+	mux.Handle("POST /internal/users/{id}/quota/release", internalOnly(handler.ReleaseQuotaHandler(quota)))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))

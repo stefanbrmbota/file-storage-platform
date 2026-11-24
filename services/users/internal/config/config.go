@@ -41,6 +41,8 @@ type Config struct {
 
 	JWTSecret string        // tajna za potpis JWT-a; nikad se ne loguje
 	JWTTTL    time.Duration // rok vazenja JWT-a
+
+	InternalToken string // deljena tajna za interne pozive (X-Internal-Token); nikad se ne loguje
 }
 
 // Load cita konfiguraciju. Vraca gresku ako je podeseno samo jedno od
@@ -63,6 +65,7 @@ func Load() (Config, error) {
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
 		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
+		InternalToken:     os.Getenv("INTERNAL_TOKEN"),
 	}
 	if (cfg.AdminEmail == "") != (cfg.AdminPassword == "") {
 		return Config{}, errors.New("config: ADMIN_EMAIL i ADMIN_PASSWORD moraju biti postavljeni zajedno")
