@@ -1,1 +1,27 @@
-/* You can add global styles to this file, and also import other style files */
+/* Zajednicke boje i osnovni stil (T-32.2). Stranice koriste ove promenljive. */
+:root {
+  --text: #1f2328;
+  --muted: #59636e;
+  --border: #d1d9e0;
+  --surface: #f6f8fa;
+  --background: #ffffff;
+  --accent: #0969da;
+  --success: #1a7f37;
+  --danger: #cf222e;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--text);
+  background: var(--background);
+  line-height: 1.5;
+}
+
+a {
+  color: var(--accent);
+}

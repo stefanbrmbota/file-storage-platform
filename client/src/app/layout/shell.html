@@ -1,0 +1,20 @@
+<header class="header">
+  <div class="header__inner">
+    <a class="brand" routerLink="/">File Storage</a>
+    <nav class="nav" aria-label="Glavna navigacija">
+      @for (item of nav; track item.path) {
+        <a
+          class="nav__link"
+          [routerLink]="item.path"
+          routerLinkActive="nav__link--active"
+          [routerLinkActiveOptions]="{ exact: item.path === '/' }"
+          >{{ item.label }}</a
+        >
+      }
+    </nav>
+  </div>
+</header>
+
+<main class="content">
+  <router-outlet />
+</main>

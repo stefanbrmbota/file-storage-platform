@@ -1,42 +1,64 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
-import { App } from './app';
+import { Router, provideRouter } from '@angular/router';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { Title } from '@angular/platform-browser';
+import { routes } from './app.routes';
 import { ConfigService } from './core/config.service';
 
-describe('App', () => {
+describe('Rutiranje (T-32.2)', () => {
   let http: HttpTestingController;
 
-  beforeEach(async () => {
-    await TestBed.configureTestingModule({
-      imports: [App],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
-    }).compileComponents();
+  beforeEach(() => {
+    TestBed.configureTestingModule({
+      providers: [provideRouter(routes), provideHttpClient(), provideHttpClientTesting()],
+    });
     TestBed.inject(ConfigService).setForTest({ gatewayUrl: 'http://gw.test' });
     http = TestBed.inject(HttpTestingController);
   });
 
   afterEach(() => http.verify());
 
-  it('poziva /health na adresi gateway-a iz konfiguracije', async () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
+  function text(harness: RouterTestingHarness): string {
+    return (harness.routeNativeElement?.ownerDocument.body.textContent ?? '').replace(/\s+/g, ' ');
+  }
 
+  it('/ prikazuje pocetnu stranicu u rasporedu sa zaglavljem', async () => {
+    const harness = await RouterTestingHarness.create('/');
     http.expectOne('http://gw.test/health').flush({ status: 'ok' });
-    await fixture.whenStable();
+    harness.detectChanges();
 
-    const status = (fixture.nativeElement as HTMLElement).querySelector('.status');
-    expect(status?.textContent).toContain('dostupan');
+    const root = harness.fixture.nativeElement as HTMLElement;
+    expect(root.querySelector('header .brand')?.textContent).toContain('File Storage');
+    expect(root.querySelector('nav a')?.textContent).toContain('Početna');
+    expect(text(harness)).toContain('Dobrodošli');
+    expect(text(harness)).toContain('Gateway: dostupan');
+    expect(TestBed.inject(Title).getTitle()).toBe('Početna | File Storage');
   });
 
-  it('prikazuje da gateway nije dostupan kad poziv ne uspe', async () => {
-    const fixture = TestBed.createComponent(App);
-    fixture.detectChanges();
+  it('nepostojeca adresa prikazuje 404, a zaglavlje ostaje', async () => {
+    const harness = await RouterTestingHarness.create('/nepostojeca/stranica');
+    const root = harness.fixture.nativeElement as HTMLElement;
 
-    http.expectOne('http://gw.test/health').flush(null, { status: 503, statusText: 'Service Unavailable' });
-    await fixture.whenStable();
+    expect(root.querySelector('h1')?.textContent).toBe('404');
+    expect(root.querySelector('header .brand')).not.toBeNull();
+    expect(TestBed.inject(Title).getTitle()).toBe('Stranica ne postoji | File Storage');
+  });
 
-    const status = (fixture.nativeElement as HTMLElement).querySelector('.status');
-    expect(status?.textContent).toContain('nedostupan');
+  it('link "Nazad na pocetnu" vodi na / bez ponovnog ucitavanja', async () => {
+    const harness = await RouterTestingHarness.create('/nema');
+    const link = (harness.fixture.nativeElement as HTMLElement).querySelector<HTMLAnchorElement>(
+      'main a[href="/"]',
+    );
+    expect(link).not.toBeNull();
+
+    link!.click(); // ruter preuzima klik, nema novog zahteva za stranicu
+    await harness.fixture.whenStable();
+    http.expectOne('http://gw.test/health').flush({ status: 'ok' });
+    harness.detectChanges();
+
+    expect(TestBed.inject(Router).url).toBe('/');
+    expect(text(harness)).toContain('Dobrodošli');
   });
 });
