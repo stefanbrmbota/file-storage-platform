@@ -10,7 +10,11 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/auth"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/routes"
 )
 
 func main() {
@@ -28,29 +32,29 @@ func main() {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	// Gateway ima eksplicitnu listu ruta (T-30.2, design 5.2); sve ostalo,
-	// ukljucujuci /internal/..., vraca 404 (design 5.3, tacka 4).
-	mux.HandleFunc("/", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusNotFound)
-		_, _ = w.Write([]byte(`{"error":"not found"}`))
-	})
+	// Eksplicitna lista ruta (design 5.2); sve ostalo, ukljucujuci
+	// /internal/..., vraca 404 (design 5.3, tacka 4). Rute koje nisu javne
+	// traze ispravan, neopozvan JWT (T-30.5).
+	routes.Register(mux, map[routes.Service]http.Handler{
+		routes.Users:         proxy.New(cfg.UsersURL, cfg.UpstreamTimeout, logger),
+		routes.Files:         proxy.New(cfg.FilesURL, cfg.UpstreamTimeout, logger),
+		routes.Sharing:       proxy.New(cfg.SharingURL, cfg.UpstreamTimeout, logger),
+		routes.Notifications: proxy.New(cfg.NotificationsURL, cfg.UpstreamTimeout, logger),
+		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
+	}, auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger))
 
-	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           mux,
-		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       30 * time.Second,
-		WriteTimeout:      30 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
+	srv := newServer(cfg, cors.Middleware(cfg.CORSAllowedOrigins, mux))
 
 	go func() {
 		logger.Info("gateway service started", "port", cfg.Port,
 			"upstream_timeout", cfg.UpstreamTimeout.String(),
+			"auth_timeout", cfg.AuthTimeout.String(),
+			"read_header_timeout", cfg.ReadHeaderTimeout.String(),
+			"idle_timeout", cfg.IdleTimeout.String(),
 			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
 			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
-			"analytics", cfg.AnalyticsURL.Host)
+			"analytics", cfg.AnalyticsURL.Host,
+			"cors_origins", cfg.CORSAllowedOrigins)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)

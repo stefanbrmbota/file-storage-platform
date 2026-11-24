@@ -1,6 +1,7 @@
 package proxy
 
 import (
+	"context"
 	"encoding/json"
 	"io"
 	"log/slog"
@@ -10,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/auth"
 )
 
 func discardLogger() *slog.Logger {
@@ -150,5 +153,82 @@ func TestUpstreamErrorStatusIsPassedThrough(t *testing.T) {
 	}
 	if msg := errorBody(t, rec); msg != "folder not found" {
 		t.Errorf("poruka = %q", msg)
+	}
+}
+
+func TestPlainTextErrorBecomesJSON(t *testing.T) {
+	// net/http za nepoznatu rutu vraca "404 page not found" kao tekst.
+	upstream := httptest.NewServer(http.NotFoundHandler())
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/notifications", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, ocekivano 404", rec.Code)
+	}
+	if msg := errorBody(t, rec); msg != "not found" {
+		t.Errorf("poruka = %q", msg)
+	}
+}
+
+func TestServerErrorDetailsAreHidden(t *testing.T) {
+	for _, ct := range []string{"application/json", "text/plain"} {
+		t.Run(ct, func(t *testing.T) {
+			upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", ct)
+				w.WriteHeader(http.StatusInternalServerError)
+				_, _ = w.Write([]byte(`{"error":"mongo: connection refused at 10.0.0.5"}`))
+			}))
+			defer upstream.Close()
+
+			h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/folders/x", nil))
+
+			if rec.Code != http.StatusInternalServerError {
+				t.Fatalf("status = %d, ocekivano 500", rec.Code)
+			}
+			if msg := errorBody(t, rec); msg != "internal error" {
+				t.Errorf("poruka = %q, detalji servisa ne smeju do klijenta", msg)
+			}
+		})
+	}
+}
+
+func TestSuccessBodyIsUntouched(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write([]byte("sadrzaj datoteke"))
+	}))
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/files/x/content", nil))
+
+	if rec.Code != http.StatusOK || rec.Body.String() != "sadrzaj datoteke" {
+		t.Errorf("status = %d, telo = %q", rec.Code, rec.Body.String())
+	}
+}
+
+func TestIdentityFromAuthIsForwarded(t *testing.T) {
+	var gotID, gotRole string
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotID, gotRole = r.Header.Get(HeaderUserID), r.Header.Get(HeaderUserRole)
+	}))
+	defer upstream.Close()
+
+	h := New(mustURL(t, upstream.URL), time.Second, discardLogger())
+	req := httptest.NewRequest(http.MethodGet, "/folders/x/contents", nil)
+	// Klijent pokusava da podmetne tudji identitet; vazi samo onaj iz tokena.
+	req.Header.Set(HeaderUserID, "tudji-id")
+	req.Header.Set(HeaderUserRole, "ADMIN")
+	req = req.WithContext(auth.ContextWithIdentity(context.Background(), auth.Identity{UserID: "u1", Role: "USER"}))
+	h.ServeHTTP(httptest.NewRecorder(), req)
+
+	if gotID != "u1" || gotRole != "USER" {
+		t.Errorf("servis dobio %s=%q, %s=%q", HeaderUserID, gotID, HeaderUserRole, gotRole)
 	}
 }
