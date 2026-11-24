@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/config"
+	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/handler"
+	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/repository"
 )
 
 func main() {
@@ -23,11 +25,18 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Povezivanje na Cassandru i pravljenje tabela (T-07.1). Bez baze servis
+	// ne moze da radi, pa se ne pokrece.
+	session, err := repository.Connect(context.Background(), cfg.Cassandra, logger)
+	if err != nil {
+		logger.Error("cassandra nije dostupna", "err", err)
+		os.Exit(1)
+	}
+	store := repository.NewStore(session, cfg.Cassandra.Timeout)
+	defer store.Close()
+
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok"}`))
-	})
+	mux.HandleFunc("GET /health", handler.Health(store))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
@@ -39,7 +48,8 @@ func main() {
 	}
 
 	go func() {
-		logger.Info("notifications service started", "port", cfg.Port)
+		logger.Info("notifications service started", "port", cfg.Port,
+			"cassandra_hosts", cfg.Cassandra.Hosts, "keyspace", cfg.Cassandra.Keyspace)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)
