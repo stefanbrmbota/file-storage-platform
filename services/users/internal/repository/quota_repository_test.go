@@ -94,3 +94,71 @@ func TestReserveQuota_ConcurrentNeverExceeds(t *testing.T) {
 		t.Errorf("uspesnih = %d, usedBytes = %d; ocekivano 10 i 1000", ok, u.UsedBytes)
 	}
 }
+
+func TestReleaseQuota_Success(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+	seedUser(t, repo, "u1", 1000)
+	if _, err := repo.ReserveQuota(ctx, "u1", 600); err != nil {
+		t.Fatal(err)
+	}
+
+	used, err := repo.ReleaseQuota(ctx, "u1", 250)
+	if err != nil || used != 350 {
+		t.Fatalf("used = %d, err = %v", used, err)
+	}
+	u, _ := repo.FindByID(ctx, "u1")
+	if u.UsedBytes != 350 {
+		t.Errorf("usedBytes = %d, ocekivano 350", u.UsedBytes)
+	}
+}
+
+func TestReleaseQuota_NeverBelowZero(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+	seedUser(t, repo, "u1", 1000)
+	if _, err := repo.ReserveQuota(ctx, "u1", 100); err != nil {
+		t.Fatal(err)
+	}
+
+	used, err := repo.ReleaseQuota(ctx, "u1", 500)
+	if err != nil || used != 0 {
+		t.Fatalf("used = %d, err = %v; ocekivano 0", used, err)
+	}
+	u, _ := repo.FindByID(ctx, "u1")
+	if u.UsedBytes != 0 {
+		t.Errorf("usedBytes = %d, ocekivano 0", u.UsedBytes)
+	}
+}
+
+func TestReleaseQuota_UnknownUser(t *testing.T) {
+	repo := newTestRepo(t)
+	if _, err := repo.ReleaseQuota(context.Background(), "nema", 10); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("err = %v, ocekivano ErrNotFound", err)
+	}
+}
+
+func TestReleaseQuota_ConcurrentNeverBelowZero(t *testing.T) {
+	repo := newTestRepo(t)
+	ctx := context.Background()
+	seedUser(t, repo, "u1", 1000)
+	if _, err := repo.ReserveQuota(ctx, "u1", 1000); err != nil {
+		t.Fatal(err)
+	}
+
+	const workers, each = 40, 100 // zajedno 4000 B, a zauzeto je 1000 B
+	var wg sync.WaitGroup
+	for i := 0; i < workers; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = repo.ReleaseQuota(ctx, "u1", each)
+		}()
+	}
+	wg.Wait()
+
+	u, _ := repo.FindByID(ctx, "u1")
+	if u.UsedBytes != 0 {
+		t.Errorf("usedBytes = %d, ocekivano 0", u.UsedBytes)
+	}
+}

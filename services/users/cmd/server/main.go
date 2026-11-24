@@ -127,6 +127,7 @@ func main() {
 	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
 	mux.HandleFunc("POST /internal/users/{id}/quota/reserve", handler.ReserveQuotaHandler(quota))
+	mux.HandleFunc("POST /internal/users/{id}/quota/release", handler.ReleaseQuotaHandler(quota))
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
