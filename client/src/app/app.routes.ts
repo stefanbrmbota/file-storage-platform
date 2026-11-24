@@ -19,6 +19,12 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/home/home').then((m) => m.Home),
       },
       {
+        // Interceptor ovde salje korisnika kad token istekne; formu pravi T-32.4.
+        path: 'prijava',
+        title: 'Prijava | File Storage',
+        loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+      },
+      {
         path: '**',
         title: 'Stranica ne postoji | File Storage',
         loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
