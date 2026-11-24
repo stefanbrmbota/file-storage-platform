@@ -10,9 +10,11 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/client"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/model"
+	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/service"
 )
 
@@ -21,6 +23,26 @@ type memCreator struct{ saved []*model.File }
 func (m *memCreator) Create(_ context.Context, f *model.File) error {
 	m.saved = append(m.saved, f)
 	return nil
+}
+
+func (m *memCreator) FindByID(_ context.Context, id string) (*model.File, error) {
+	for _, f := range m.saved {
+		if f.ID == id {
+			found := *f
+			return &found, nil
+		}
+	}
+	return nil, repository.ErrNotFound
+}
+
+func (m *memCreator) UpdateContent(_ context.Context, id, key string, size int64, ct, hash string, at time.Time) error {
+	for _, f := range m.saved {
+		if f.ID == id {
+			f.ObjectKey, f.Size, f.ContentType, f.Hash, f.UpdatedAt = key, size, ct, hash, at
+			return nil
+		}
+	}
+	return repository.ErrNotFound
 }
 
 type memObjects struct{ data map[string]string }

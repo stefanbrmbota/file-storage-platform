@@ -62,6 +62,28 @@ func (r *FileRepository) Rename(ctx context.Context, id, name string, updatedAt 
 	return rename(ctx, r.coll, id, name, updatedAt)
 }
 
+// UpdateContent points a file to a new version of its content: new object
+// key, size, type and hash. Name, owner and folder stay the same.
+func (r *FileRepository) UpdateContent(ctx context.Context, id, objectKey string, size int64, contentType, hash string, updatedAt time.Time) error {
+	res, err := r.coll.UpdateOne(ctx,
+		bson.M{"_id": id},
+		bson.M{"$set": bson.M{
+			"objectKey":   objectKey,
+			"size":        size,
+			"contentType": contentType,
+			"hash":        hash,
+			"updatedAt":   updatedAt,
+		}},
+	)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListByParent returns all files in one folder, sorted by name.
 func (r *FileRepository) ListByParent(ctx context.Context, ownerID, parentID string) ([]model.File, error) {
 	filter := bson.M{"ownerId": ownerID, "parentId": parentID}
