@@ -1,0 +1,9 @@
+<h1>Primer stranice</h1>
+
+@if (loading()) {
+  <p>Učitavam…</p>
+} @else if (error()) {
+  <p class="error" role="alert">{{ error() }}</p>
+} @else if (data(); as d) {
+  <p>Gateway je potvrdio prijavu (uloga: {{ d.role }}).</p>
+}

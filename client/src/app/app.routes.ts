@@ -8,7 +8,7 @@ import { authGuard, guestGuard } from './core/auth/auth.guard';
  * (loadComponent), da pocetno ucitavanje ostane malo.
  *
  * Nova stranica: dodaj child rutu ispred '**' i stavku u Shell.nav. Stranica
- * koja trazi prijavu dobija canActivate: [authGuard].
+ * koja trazi prijavu dobija canActivate: [authGuard]. Uputstvo: docs/klijent.md.
  */
 export const routes: Routes = [
   {
@@ -28,6 +28,13 @@ export const routes: Routes = [
         canActivate: [guestGuard],
         title: 'Prijava | File Storage',
         loadComponent: () => import('./pages/login/login').then((m) => m.Login),
+      },
+      {
+        // PRIMER zasticene stranice za kopiranje (T-32.5, docs/klijent.md); nije u navigaciji.
+        path: 'primer',
+        canActivate: [authGuard],
+        title: 'Primer | File Storage',
+        loadComponent: () => import('./pages/primer/primer').then((m) => m.Primer),
       },
       {
         path: '**',

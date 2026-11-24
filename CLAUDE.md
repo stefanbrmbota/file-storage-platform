@@ -82,3 +82,13 @@ Pravila kad menjaš servis ili compose:
 - Podaci baza su u imenovanim volume-ima (`mongo-data`, `cassandra-data`, `neo4j-data`, `minio-data`) i ostaju posle `docker compose down`; briše ih samo `down -v`.
 - Git Bash na Windows-u: za `docker compose exec <servis> /app/...` prvo `export MSYS_NO_PATHCONV=1`, inače se putanja pretvori u Windows putanju.
 - Lokalni rad bez Docker-a (`go run ./cmd/server`) i dalje koristi `localhost` adrese iz `.env.example`.
+
+## Klijent (Angular, US-32, vlasnik AP)
+`client/` je Angular aplikacija na portu 3000; adresu gateway-a čita iz `/config.json` (u Docker-u ga pravi kontejner iz `GATEWAY_URL`, za `ng serve` je `client/public/config.json`). Iz `client/`:
+```
+npm install
+npx ng serve
+npx ng test --watch=false
+npx ng build
+```
+Nova stranica: `pages/<stranica>/` (`npx ng generate component pages/<stranica>`), ruta u `app.routes.ts` ispred `'**'` (zaštićena sa `canActivate: [authGuard]`), stavka menija u `layout/shell.ts`. Gateway se zove preko `HttpClient` i `config.gatewayUrl`; token i 401 rešava interceptor, a greške `apiErrorMessage`. `core/` i `layout/` ne menjati bez dogovora sa AP. Detaljno: `docs/klijent.md`.

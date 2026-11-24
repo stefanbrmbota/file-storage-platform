@@ -22,7 +22,7 @@ export interface NavItem {
   styleUrl: './shell.css',
 })
 export class Shell {
-  /** Nova stranica dobija stavku ovde (vidi uputstvo u docs/, T-32.5). */
+  /** Nova stranica dobija stavku ovde (uputstvo: docs/klijent.md). */
   protected readonly nav: NavItem[] = [{ label: 'Početna', path: '/' }];
 
   /** Poruka o gresci na vrhu stranice (T-32.3). */
