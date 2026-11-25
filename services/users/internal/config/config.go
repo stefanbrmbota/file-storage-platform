@@ -61,7 +61,7 @@ func Load() (Config, error) {
 		SMTPFrom:          getEnv("SMTP_FROM", "no-reply@file-storage.local"),
 		SMTPUser:          os.Getenv("SMTP_USER"),
 		SMTPPassword:      os.Getenv("SMTP_PASSWORD"),
-		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/confirm"),
+		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/potvrda"),
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
 		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
