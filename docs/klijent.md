@@ -169,6 +169,20 @@ U `<stranica>.spec.ts` gateway se zamenjuje lažnim (`HttpTestingController`).
 Gotov primer je `pages/primer/primer.spec.ts`: proverava i uspešan odgovor i
 prikaz greške. Pre commit-a: `npx ng test --watch=false`.
 
+## 3.8 Registracija i potvrda naloga (US-04, T-04.5)
+
+Javne stranice (bez prijave):
+
+| Ruta | Stranica | Šta radi |
+|---|---|---|
+| `/registracija` | `pages/registracija/` | Forma (ime, prezime, email, lozinka, ponovljena lozinka); pravila lozinke su ista kao u Users servisu; greške servera se prikazuju u formi; posle uspeha poruka "Proverite mejl". |
+| `/potvrda` | `pages/potvrda/` | Ovde vodi link iz mejla: `/potvrda#token=...`. Stranica pročita token iz fragmenta, ukloni ga iz adrese i pošalje `POST /api/auth/confirm` (token u telu). |
+
+Adresu linka određuje `CONFIRM_URL_BASE` u `services/users/.env.example`
+(`http://localhost:3000/potvrda`); mejl sa linkom se vidi u MailHog-u
+(http://localhost:8025). Ako promeniš rutu `/potvrda`, promeni i tu
+promenljivu.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.

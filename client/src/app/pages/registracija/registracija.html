@@ -1,0 +1,83 @@
+<section class="reg">
+  @if (sentTo(); as email) {
+    <h1>Proverite mejl</h1>
+    <p class="reg__info">
+      Poslali smo link za potvrdu naloga na <strong>{{ email }}</strong>. Nalog možete koristiti tek kad kliknete na link.
+    </p>
+    <p><a routerLink="/prijava">Nazad na prijavu</a></p>
+  } @else {
+    <h1>Registracija</h1>
+
+    @if (error()) {
+      <p class="reg__error" role="alert">{{ error() }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <label>
+        Ime
+        <input type="text" formControlName="firstName" autocomplete="given-name" autofocus />
+      </label>
+      @if (form.controls.firstName.touched && form.controls.firstName.invalid) {
+        <small class="reg__hint">
+          {{ form.controls.firstName.errors?.['required'] ? 'Unesi ime.' : 'Ime može imati najviše 50 karaktera.' }}
+        </small>
+      }
+
+      <label>
+        Prezime
+        <input type="text" formControlName="lastName" autocomplete="family-name" />
+      </label>
+      @if (form.controls.lastName.touched && form.controls.lastName.invalid) {
+        <small class="reg__hint">
+          {{ form.controls.lastName.errors?.['required'] ? 'Unesi prezime.' : 'Prezime može imati najviše 50 karaktera.' }}
+        </small>
+      }
+
+      <label>
+        Email
+        <input type="email" formControlName="email" autocomplete="username" />
+      </label>
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <small class="reg__hint">
+          {{ form.controls.email.errors?.['required'] ? 'Unesi email.' : 'Unesi ispravan email (najviše 254 znaka).' }}
+        </small>
+      }
+
+      <label>
+        Lozinka
+        <input type="password" formControlName="password" autocomplete="new-password" />
+      </label>
+      @if (form.controls.password.touched && form.controls.password.errors; as e) {
+        <small class="reg__hint">
+          @if (e['required']) {
+            Unesi lozinku.
+          } @else {
+            Lozinka mora imati:
+            <ul>
+              @if (e['minlength']) { <li>najmanje 8 karaktera</li> }
+              @if (e['maxlength']) { <li>najviše 128 karaktera</li> }
+              @if (e['upper']) { <li>veliko slovo</li> }
+              @if (e['lower']) { <li>malo slovo</li> }
+              @if (e['digit']) { <li>broj</li> }
+              @if (e['special']) { <li>specijalni znak</li> }
+            </ul>
+          }
+        </small>
+      }
+
+      <label>
+        Ponovljena lozinka
+        <input type="password" formControlName="passwordConfirm" autocomplete="new-password" />
+      </label>
+      @if (form.controls.passwordConfirm.touched && form.controls.passwordConfirm.errors?.['required']) {
+        <small class="reg__hint">Ponovi lozinku.</small>
+      } @else if (form.controls.passwordConfirm.touched && form.errors?.['mismatch']) {
+        <small class="reg__hint">Lozinke se ne poklapaju.</small>
+      }
+
+      <button type="submit" [disabled]="busy()">{{ busy() ? 'Šaljem…' : 'Registruj se' }}</button>
+    </form>
+
+    <p class="reg__alt">Već imaš nalog? <a routerLink="/prijava">Prijavi se</a></p>
+  }
+</section>
