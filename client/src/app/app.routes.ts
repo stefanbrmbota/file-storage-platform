@@ -43,6 +43,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/potvrda/potvrda').then((m) => m.Potvrda),
       },
       {
+        // Profil i kvota skladista (US-06, T-06.3); zasticena stranica.
+        path: 'profil',
+        canActivate: [authGuard],
+        title: 'Profil | File Storage',
+        loadComponent: () => import('./pages/profil/profil').then((m) => m.Profil),
+      },
+      {
         // PRIMER zasticene stranice za kopiranje (T-32.5, docs/klijent.md); nije u navigaciji.
         path: 'primer',
         canActivate: [authGuard],

@@ -26,6 +26,7 @@ export class Shell {
   protected readonly nav: NavItem[] = [
     { label: 'Početna', path: '/' },
     { label: 'Moji fajlovi', path: '/folderi' },
+    { label: 'Profil', path: '/profil' },
   ];
 
   /** Poruka o gresci na vrhu stranice (T-32.3). */

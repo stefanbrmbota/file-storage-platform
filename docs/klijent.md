@@ -183,6 +183,16 @@ Adresu linka određuje `CONFIRM_URL_BASE` u `services/users/.env.example`
 (http://localhost:8025). Ako promeniš rutu `/potvrda`, promeni i tu
 promenljivu.
 
+## 3.9 Profil i kvota (US-06, T-06.3)
+
+Zaštićena stranica `/profil` (stavka „Profil“ u meniju, `pages/profil/`) poziva
+`GET /api/users/me` i prikazuje ime, email, ulogu i kvotu skladišta: traku
+zauzeća s procentom i brojeve kvota, zauzeto i preostalo. Traka je crvena od 90%.
+Klijent ne šalje nikakav ID: nalog određuje gateway iz tokena. Veličine se
+prikazuju funkcijom `formatSize` iz `pages/folderi/files-api.ts`, pa su brojevi isti
+kao u „Moji fajlovi“. Podaci se učitavaju pri otvaranju stranice, pa se zauzeće
+posle otpremanja vidi tek kad se `/profil` ponovo otvori.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.
