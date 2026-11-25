@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	allowMethods  = "GET, POST, PATCH, DELETE"
+	allowMethods  = "GET, POST, PUT, PATCH, DELETE"
 	allowHeaders  = "Authorization, Content-Type"
 	exposeHeaders = "Content-Disposition"
 	maxAge        = "600" // sekundi; pretrazivac pamti preflight 10 minuta

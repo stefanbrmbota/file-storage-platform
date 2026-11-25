@@ -1,0 +1,126 @@
+.path {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.path__sep {
+  color: var(--muted);
+}
+
+.path__current {
+  font-weight: 600;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.new-folder {
+  display: flex;
+  gap: 0.5rem;
+}
+
+input[type='text'] {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font: inherit;
+}
+
+button,
+.upload {
+  padding: 0.4rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:disabled,
+.upload--disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Fajl se bira klikom na label; samo polje je skriveno. */
+.upload input[type='file'],
+.upload-version input[type='file'] {
+  display: none;
+}
+
+.upload {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+button.link,
+.link {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent);
+  cursor: pointer;
+  font: inherit;
+}
+
+.items {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.items th,
+.items td {
+  text-align: left;
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.items th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.name {
+  font-weight: 500;
+}
+
+.actions {
+  display: flex;
+  gap: 1rem;
+  justify-content: flex-end;
+}
+
+.rename {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.empty {
+  padding: 1rem 0;
+}
+
+.error {
+  color: var(--danger);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}

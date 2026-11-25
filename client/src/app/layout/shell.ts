@@ -23,7 +23,10 @@ export interface NavItem {
 })
 export class Shell {
   /** Nova stranica dobija stavku ovde (uputstvo: docs/klijent.md). */
-  protected readonly nav: NavItem[] = [{ label: 'Početna', path: '/' }];
+  protected readonly nav: NavItem[] = [
+    { label: 'Početna', path: '/' },
+    { label: 'Moji fajlovi', path: '/folderi' },
+  ];
 
   /** Poruka o gresci na vrhu stranice (T-32.3). */
   protected readonly errors = inject(ErrorBannerService);
