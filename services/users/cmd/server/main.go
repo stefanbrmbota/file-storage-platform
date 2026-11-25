@@ -118,6 +118,7 @@ func main() {
 	}
 	logout := service.NewLogoutService(tokens, revokedRepo)
 	quota := service.NewQuotaService(userRepo)
+	accounts := service.NewAccountService(userRepo)
 
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
@@ -132,6 +133,8 @@ func main() {
 	mux.HandleFunc("POST /login/verify", handler.LoginVerifyHandler(login))
 	mux.HandleFunc("POST /confirm", handler.ConfirmHandler(confirmation))
 	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
+	// US-06: nalog i kvota prijavljenog korisnika; identitet dolazi iz X-User-ID (postavlja gateway).
+	mux.HandleFunc("GET /users/me", handler.MeHandler(accounts))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
 	mux.Handle("POST /internal/users/{id}/quota/reserve", internalOnly(handler.ReserveQuotaHandler(quota)))
 	mux.Handle("POST /internal/users/{id}/quota/release", internalOnly(handler.ReleaseQuotaHandler(quota)))
