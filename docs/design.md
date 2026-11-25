@@ -826,6 +826,7 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `DELETE /api/folders/{id}` | Files | da | Brisanje foldera sa sadržajem. |
 | `POST /api/folders/{id}/files` | Files | da | Otpremanje datoteke (`multipart/form-data`). |
 | `GET /api/files/{id}/content` | Files | da | Preuzimanje sadržaja (strim iz MinIO-a kroz Files servis). |
+| `PUT /api/files/{id}/content` | Files | da | Nova verzija datoteke (`multipart/form-data`, US-10): zamenjuje sadržaj, naziv ostaje. |
 | `PATCH /api/files/{id}` | Files | da | Preimenovanje ili premeštanje datoteke. |
 | `DELETE /api/files/{id}` | Files | da | Brisanje datoteke. |
 | `GET /api/search?q=` | Files | da | Pretraga sopstvenih datoteka po nazivu. |

@@ -70,6 +70,7 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 		{"DELETE", "/api/folders/f1", Files, "/folders/f1"},
 		{"POST", "/api/folders/f1/files", Files, "/folders/f1/files"},
 		{"GET", "/api/files/d1/content", Files, "/files/d1/content"},
+		{"PUT", "/api/files/d1/content", Files, "/files/d1/content"},
 		{"PATCH", "/api/files/d1", Files, "/files/d1"},
 		{"DELETE", "/api/files/d1", Files, "/files/d1"},
 		{"GET", "/api/search", Files, "/search"},

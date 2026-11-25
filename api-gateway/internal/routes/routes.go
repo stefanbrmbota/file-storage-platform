@@ -76,6 +76,7 @@ var All = []Route{
 	{"DELETE /api/folders/{id}", Files, User},
 	{"POST /api/folders/{id}/files", Files, User},
 	{"GET /api/files/{id}/content", Files, User},
+	{"PUT /api/files/{id}/content", Files, User},
 	{"PATCH /api/files/{id}", Files, User},
 	{"DELETE /api/files/{id}", Files, User},
 	{"GET /api/search", Files, User},

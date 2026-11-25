@@ -204,3 +204,64 @@ func TestUploadEndpointErrors(t *testing.T) {
 		})
 	}
 }
+
+func putVersion(h *Handler, fileID string, body io.Reader, contentType, user string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPut, "/files/"+fileID+"/content", body)
+	req.Header.Set("Content-Type", contentType)
+	if user != "" {
+		req.Header.Set("X-User-ID", user)
+	}
+	rec := httptest.NewRecorder()
+	h.Routes().ServeHTTP(rec, req)
+	return rec
+}
+
+func TestNewVersionEndpoint(t *testing.T) {
+	s := newUploadSetup(t)
+	body, ct := multipartBody(t, "file", "cv.txt", "stari sadrzaj")
+	if rec := upload(s.h, "root", body, ct, "ana"); rec.Code != http.StatusCreated {
+		t.Fatalf("first upload: %d %s", rec.Code, rec.Body)
+	}
+	fileID := s.saved.saved[0].ID
+
+	body, ct = multipartBody(t, "file", "bilo-koje-ime.txt", "novi, duzi sadrzaj")
+	rec := putVersion(s.h, fileID, body, ct, "ana")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d, body %s", rec.Code, http.StatusOK, rec.Body)
+	}
+	var got model.File
+	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+		t.Fatal(err)
+	}
+	if got.ID != fileID || got.Name != "cv.txt" || got.Size != int64(len("novi, duzi sadrzaj")) {
+		t.Errorf("same file with the old name and the new size expected, got %+v", got)
+	}
+	if len(s.objects.data) != 1 {
+		t.Errorf("MinIO should hold only the new version, got %d objects", len(s.objects.data))
+	}
+}
+
+func TestNewVersionEndpointErrors(t *testing.T) {
+	s := newUploadSetup(t)
+	body, ct := multipartBody(t, "file", "cv.txt", "x")
+	upload(s.h, "root", body, ct, "ana")
+	fileID := s.saved.saved[0].ID
+
+	tests := []struct {
+		name, fileID, user string
+		want               int
+	}{
+		{"no user", fileID, "", http.StatusUnauthorized},
+		{"unknown file", "nope", "ana", http.StatusNotFound},
+		{"not the owner", fileID, "marko", http.StatusNotFound},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body, ct := multipartBody(t, "file", "a.txt", "nova")
+			if rec := putVersion(s.h, tc.fileID, body, ct, tc.user); rec.Code != tc.want {
+				t.Fatalf("status = %d, want %d, body %s", rec.Code, tc.want, rec.Body)
+			}
+		})
+	}
+}
