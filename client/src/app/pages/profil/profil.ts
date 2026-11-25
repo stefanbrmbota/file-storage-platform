@@ -1,5 +1,6 @@
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { RouterLink } from '@angular/router';
 import { ConfigService } from '../../core/config.service';
 import { apiErrorMessage } from '../../core/http/api-error';
 import { formatSize } from '../folderi/files-api';
@@ -27,6 +28,7 @@ const HIGH_USAGE_PERCENT = 90;
  */
 @Component({
   selector: 'app-profil',
+  imports: [RouterLink],
   templateUrl: './profil.html',
   styleUrl: './profil.css',
 })

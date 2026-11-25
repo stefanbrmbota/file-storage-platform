@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { Account, Profil } from './profil';
 import { formatSize } from '../folderi/files-api';
 import { ConfigService } from '../../core/config.service';
@@ -28,7 +29,7 @@ describe('Profil (kvota i zauzece)', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [Profil],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     TestBed.inject(ConfigService).setForTest({ gatewayUrl: GW });
     http = TestBed.inject(HttpTestingController);
@@ -122,6 +123,11 @@ describe('Profil (kvota i zauzece)', () => {
     expect(el.textContent).not.toContain('NaN');
     expect(el.textContent).not.toContain('Infinity');
     expect(el.textContent).toContain('(0%)');
+  });
+
+  it('ima link za promenu lozinke (US-14)', () => {
+    const el = render(account());
+    expect(el.querySelector('a[href="/promena-lozinke"]')?.textContent).toContain('Promeni lozinku');
   });
 
   it('administrator ima oznaku uloge', () => {

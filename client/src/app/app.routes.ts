@@ -50,6 +50,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/profil/profil').then((m) => m.Profil),
       },
       {
+        // Promena lozinke (US-14, T-14.4); zasticena stranica, link je na profilu.
+        path: 'promena-lozinke',
+        canActivate: [authGuard],
+        title: 'Promena lozinke | File Storage',
+        loadComponent: () => import('./pages/promena-lozinke/promena-lozinke').then((m) => m.PromenaLozinke),
+      },
+      {
         // PRIMER zasticene stranice za kopiranje (T-32.5, docs/klijent.md); nije u navigaciji.
         path: 'primer',
         canActivate: [authGuard],

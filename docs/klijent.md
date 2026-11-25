@@ -193,6 +193,17 @@ prikazuju funkcijom `formatSize` iz `pages/folderi/files-api.ts`, pa su brojevi 
 kao u „Moji fajlovi“. Podaci se učitavaju pri otvaranju stranice, pa se zauzeće
 posle otpremanja vidi tek kad se `/profil` ponovo otvori.
 
+## 3.10 Promena lozinke (US-14, T-14.4)
+
+Zaštićena stranica `/promena-lozinke` (link „Promeni lozinku“ na `/profil`, `pages/promena-lozinke/`)
+šalje `POST /api/users/me/password` sa trenutnom, novom i ponovljenom lozinkom.
+Nova lozinka se proverava istim pravilima kao pri registraciji: pravila su u
+`pages/registracija/password-rules.ts` i dele ih obe stranice. Greške servera
+(pogrešna trenutna lozinka 403, prerano menjanje 409, pravila 400) prikazuju se u formi.
+Posle uspeha Users servis opoziva token zahteva, pa klijent briše sačuvani token
+i traži novu prijavu novom lozinkom. Za demonstraciju skrati `PASSWORD_MIN_AGE`
+(npr. `1m`) u `services/users/.env`; podrazumevano lozinka mora biti stara 24 h.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.
