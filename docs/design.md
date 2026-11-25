@@ -902,7 +902,7 @@ Interne rute počinju sa `/internal/` i dostupne su samo u internoj mreži.
 |---|---|---|---|---|---|---|---|
 | S1 | Users → Files | `POST /internal/folders/root` `{ownerId}` | Potvrda registracije | Nalog se aktivira tek kada korisnik ima koren; bez korena nalog je neupotrebljiv. | `USERS_REQUEST_TIMEOUT` (5s) | Token za potvrdu se vraća u bazu, nalog ostaje neaktivan, korisnik ponovo klikne link. Ruta je idempotentna. | implementirano |
 | S2 | Files → Sharing | `GET /internal/access?userId=&resourceId=` → `{isOwner, permission}` | Korisnik pristupa resursu čiji nije vlasnik | Odgovor odlučuje da li se zahtev izvršava. | `FILES_REQUEST_TIMEOUT` (5s) | **Odbija se** (`503`): bez potvrde prava nema pristupa (fail closed). Vlasnik svom resursu pristupa bez ovog poziva. | planirano |
-| S3 | Files → Users | `POST /internal/users/{id}/quota/reserve` `{bytes}` i `.../quota/release` `{bytes}` | Otpremanje i brisanje datoteke | Upload ne sme početi ako nema mesta; rezervacija mora biti atomična (`usedBytes + bytes ≤ quotaBytes` u jednom `UpdateOne`). | `FILES_REQUEST_TIMEOUT` (5s) | Upload se odbija (`503`). Neuspelo oslobađanje se ponavlja (saga, 5.6). | planirano |
+| S3 | Files → Users | `POST /internal/users/{id}/quota/reserve` `{bytes}` i `.../quota/release` `{bytes}` | Otpremanje i brisanje datoteke | Upload ne sme početi ako nema mesta; rezervacija mora biti atomična (`usedBytes + bytes ≤ quotaBytes` u jednom `UpdateOne`). | `FILES_REQUEST_TIMEOUT` (5s) | Upload se odbija (`503`). Neuspelo oslobađanje se ponavlja (saga, 5.6). | implementirano (Users strana, zaštićeno `X-Internal-Token`; poziv iz Files-a planiran) |
 | S4 | Sharing → Users | `POST /internal/users/lookup` `{email}` → `{id, active}` | Deljenje sa korisnikom zadatim mejlom | Bez ID-ja primaoca deljenje ne može da se upiše. | `SHARING_REQUEST_TIMEOUT` (5s) | Deljenje se odbija (`503`). | planirano |
 | S5 | Analytics → Files | `GET /internal/files/{id}/owner` → `{ownerId}` | Statistika preuzimanja jedne datoteke (A4) | Samo vlasnik sme da vidi statistiku; Analytics ne zna vlasnika. | `ANALYTICS_REQUEST_TIMEOUT` (5s) | Zahtev se odbija (`503`). | planirano |
 | S6 | Gateway → Users | `POST /internal/tokens/check` `{jti}` → `{revoked}` | Svaki zahtev na zaštićenoj ruti, posle provere potpisa i roka tokena | Odjavljen token mora odmah prestati da važi, a gateway ne zna za odjave. | `GATEWAY_AUTH_TIMEOUT` (5s) | **Odbija se** (`503`): bez potvrde da token nije opozvan nema pristupa (fail closed). | implementirano |
@@ -918,7 +918,43 @@ Napomene:
   otprema.
 - *Predlog za IB (SC):* interne rute dodatno štititi zajedničkim tajnim
   headerom (`X-Internal-Token` iz env-a) ili mTLS-om, a u K8s-u NetworkPolicy
-  koja dozvoljava samo pozive iz tabele.
+  koja dozvoljava samo pozive iz tabele. Za rute kvote (S3) je header
+  implementiran (vidi 5.4.1); ostale interne rute (S1, S6...) još nisu zaštićene.
+
+#### 5.4.1 Ugovor za S3: kvota (Users)
+
+Koristi ga Files pri otpremanju (US-02) i brisanju (US-10). Obe rute zahtevaju
+zaglavlje `X-Internal-Token` sa tajnom iz env-a `INTERNAL_TOKEN` (ista vrednost
+kod pozivaoca i u Users-u, min. 32 karaktera; Users se ne pokreće bez nje).
+Telo je JSON `{"bytes": N}`, gde je `0 < N ≤ 2^50` (1 PiB); nepoznata polja se
+odbijaju. `{id}` je ID korisnika, za otpremanje u tuđi folder ID vlasnika
+foldera (D4). Svaki poziv mora imati timeout (`FILES_REQUEST_TIMEOUT`).
+
+| Ruta | Efekat | 200 odgovor |
+|---|---|---|
+| `POST /internal/users/{id}/quota/reserve` | Atomično `usedBytes += bytes`, samo ako je `usedBytes + bytes ≤ quotaBytes` (jedan `FindOneAndUpdate`). | `{"reserved": N, "remainingBytes": R}` |
+| `POST /internal/users/{id}/quota/release` | Atomično `usedBytes = max(0, usedBytes - bytes)`. | `{"released": N, "usedBytes": U}` |
+
+| Status | Značenje | Šta radi pozivalac |
+|---|---|---|
+| `200` | Uspeh. | Nastavlja. |
+| `400` | Neispravno telo ili `bytes` van opsega. | Greška u pozivaocu, ne ponavlja. |
+| `401` | Nedostaje ili je pogrešan `X-Internal-Token`. | Greška konfiguracije, ne ponavlja. |
+| `404` | Korisnik ne postoji. | Odbija zahtev. |
+| `409` | Nema mesta u kvoti (samo `reserve`); `usedBytes` se ne menja. | Odbija otpremanje, korisniku javlja da nema prostora. |
+| `503` | Greška baze. | `reserve`: odbija otpremanje; `release`: ponavlja (saga, 5.6). |
+
+Greške su uvek JSON `{"error": "..."}`, bez internih detalja. Primer:
+
+```
+curl -X POST http://users:8081/internal/users/<id>/quota/reserve \
+  -H "X-Internal-Token: $INTERNAL_TOKEN" -H "Content-Type: application/json" \
+  -d '{"bytes": 1048576}'
+```
+
+Poznato ograničenje: `release` nije idempotentan. Ako je poziv prošao, a
+odgovor se izgubio, ponavljanje oslobađa dvaput (clamp na 0 samo sprečava
+negativnu vrednost). Vidi O23.
 
 ### 5.5 Asinhrona komunikacija (događaji)
 
@@ -1105,10 +1141,10 @@ upućuje.
 | O1 | Odbijanje JWT-a izdatog pre `passwordChangedAt` | Planirano | 1.2, 5.3 | SC | otvoreno |
 | O2 | Limit pokušaja za OTP (`attempts`), posle čega se OTP briše | Planirano | 1.2, 1.6 | SC | otvoreno |
 | O3 | Indeks `{ role: 1, createdAt: -1 }` za admin pregled korisnika | Predlog | 1.6 | SC | otvoreno |
-| O4 | Interni endpointi za kvotu (`quota/reserve`, `quota/release`) i događaj `quota.threshold_reached` | Planirano | 4.2, 5.4 (S3) | SC | otvoreno |
+| O4 | Interni endpointi za kvotu (`quota/reserve`, `quota/release`) i događaj `quota.threshold_reached` | Rute implementirane (US-20), događaj planiran | 4.2, 5.4 (S3), 5.4.1 | SC | događaj otvoren |
 | O5 | Interni endpoint `POST /internal/users/lookup` | Planirano | 5.4 (S4) | SC | otvoreno |
 | O6 | Emitovanje događaja `user.activated`, `user.logged_in`, `user.deleted` | Planirano | 4.2 | SC | otvoreno |
-| O7 | Zaštita internih ruta (`X-Internal-Token` ili mTLS) i K8s NetworkPolicy | Predlog | 5.4 | SC, AP | otvoreno |
+| O7 | Zaštita internih ruta (`X-Internal-Token` ili mTLS) i K8s NetworkPolicy | `X-Internal-Token` implementiran za S3, ostalo predlog | 5.4, 5.4.1 | SC, AP | otvoreno za ostale rute i NetworkPolicy |
 | O8 | Ograničenje broja zahteva na `/api/auth/*` | Predlog | 5.3 | SC, AP | otvoreno |
 | O9 | Izbor brokera (i particionisanje po `ownerId` radi redosleda) | Planirano | 4.1, 5.5 | SB | otvoreno |
 | O10 | Transakcioni outbox za pouzdano emitovanje događaja | Predlog | 5.5 | SB, SC | otvoreno |
@@ -1123,3 +1159,4 @@ upućuje.
 | O19 | Konačan spisak tipova obaveštenja | Pretpostavka | 3.5 | AP | čeka story za obaveštenja |
 | O20 | Konačan spisak metrika i prikaza analitike | Pretpostavka | 4.3 | AP | čeka story za analitiku |
 | O21 | Planirane rute spoljnog API-ja | Planirano | 5.2 | svi, po servisu | otvoreno |
+| O23 | Idempotentnost `quota/release`: identifikator operacije (npr. ID datoteke) da ponovljeno oslobađanje ne oslobodi dvaput | Predlog | 5.4.1, 5.6 | SB, SC | otvoreno |
