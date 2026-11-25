@@ -37,6 +37,19 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/primer/primer').then((m) => m.Primer),
       },
       {
+        // Folderi i datoteke (SB): /folderi je korenski folder, /folderi/:id bilo koji drugi.
+        path: 'folderi',
+        canActivate: [authGuard],
+        title: 'Moji fajlovi | File Storage',
+        loadComponent: () => import('./pages/folderi/folderi').then((m) => m.Folderi),
+      },
+      {
+        path: 'folderi/:id',
+        canActivate: [authGuard],
+        title: 'Moji fajlovi | File Storage',
+        loadComponent: () => import('./pages/folderi/folderi').then((m) => m.Folderi),
+      },
+      {
         path: '**',
         title: 'Stranica ne postoji | File Storage',
         loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),

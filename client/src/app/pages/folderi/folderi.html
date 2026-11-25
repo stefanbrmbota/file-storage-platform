@@ -1,0 +1,132 @@
+<h1>Moji fajlovi</h1>
+
+@if (loading() && !contents()) {
+  <p>Učitavam…</p>
+} @else if (loadError()) {
+  <p class="error" role="alert">{{ loadError() }}</p>
+  <a routerLink="/folderi">Nazad na koren</a>
+} @else if (contents(); as c) {
+  <!-- Putanja od korena do trenutnog foldera (US-03): klik vraća nazad. -->
+  <nav class="path" aria-label="Putanja">
+    @for (step of c.path; track step.id; let i = $index; let last = $last) {
+      @if (last) {
+        <span class="path__current" aria-current="page">{{ i === 0 ? 'Moji fajlovi' : step.name }}</span>
+      } @else {
+        <a [routerLink]="linkTo(i, step.id)">{{ i === 0 ? 'Moji fajlovi' : step.name }}</a>
+        <span class="path__sep" aria-hidden="true">/</span>
+      }
+    }
+  </nav>
+
+  <div class="toolbar">
+    <form class="new-folder" (submit)="$event.preventDefault(); createFolder()">
+      <label class="sr-only" for="new-folder-name">Naziv novog foldera</label>
+      <input
+        id="new-folder-name"
+        type="text"
+        maxlength="255"
+        placeholder="Naziv novog foldera"
+        [value]="newFolderName()"
+        (input)="newFolderName.set($any($event.target).value)"
+        [disabled]="busy()"
+      />
+      <button type="submit" [disabled]="busy()">Novi folder</button>
+    </form>
+
+    <label class="upload" [class.upload--disabled]="busy()">
+      Otpremi fajl
+      <input type="file" (change)="uploadSelected($event)" [disabled]="busy()" />
+    </label>
+  </div>
+
+  @if (actionError()) {
+    <p class="error" role="alert">{{ actionError() }}</p>
+  }
+  @if (busy()) {
+    <p class="muted">Radim…</p>
+  }
+
+  @if (c.folders.length === 0 && c.files.length === 0) {
+    <p class="muted empty">Folder je prazan.</p>
+  } @else {
+    <table class="items">
+      <thead>
+        <tr>
+          <th>Naziv</th>
+          <th>Tip</th>
+          <th>Veličina</th>
+          <th>Izmenjeno</th>
+          <th><span class="sr-only">Akcije</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (f of c.folders; track f.id) {
+          <tr>
+            <td>
+              @if (isRenaming('folder', f.id)) {
+                <form class="rename" (submit)="$event.preventDefault(); saveRename()">
+                  <input
+                    type="text"
+                    maxlength="255"
+                    aria-label="Novi naziv foldera"
+                    [value]="renameValue()"
+                    (input)="renameValue.set($any($event.target).value)"
+                  />
+                  <button type="submit" [disabled]="busy()">Sačuvaj</button>
+                  <button type="button" class="link" (click)="cancelRename()">Otkaži</button>
+                </form>
+              } @else {
+                <button type="button" class="link name" (click)="openFolder(f)">📁 {{ f.name }}</button>
+              }
+            </td>
+            <td class="muted">folder</td>
+            <td class="muted">—</td>
+            <td class="muted">{{ f.updatedAt | date: 'dd.MM.yyyy. HH:mm' }}</td>
+            <td class="actions">
+              @if (!isRenaming('folder', f.id)) {
+                <button type="button" class="link" (click)="startRename('folder', f.id, f.name)" [disabled]="busy()">
+                  Preimenuj
+                </button>
+              }
+            </td>
+          </tr>
+        }
+        @for (file of c.files; track file.id) {
+          <tr>
+            <td>
+              @if (isRenaming('file', file.id)) {
+                <form class="rename" (submit)="$event.preventDefault(); saveRename()">
+                  <input
+                    type="text"
+                    maxlength="255"
+                    aria-label="Novi naziv datoteke"
+                    [value]="renameValue()"
+                    (input)="renameValue.set($any($event.target).value)"
+                  />
+                  <button type="submit" [disabled]="busy()">Sačuvaj</button>
+                  <button type="button" class="link" (click)="cancelRename()">Otkaži</button>
+                </form>
+              } @else {
+                <span class="name">📄 {{ file.name }}</span>
+              }
+            </td>
+            <td class="muted">{{ file.contentType }}</td>
+            <td>{{ formatSize(file.size) }}</td>
+            <td class="muted">{{ file.updatedAt | date: 'dd.MM.yyyy. HH:mm' }}</td>
+            <td class="actions">
+              @if (!isRenaming('file', file.id)) {
+                <button type="button" class="link" (click)="startRename('file', file.id, file.name)" [disabled]="busy()">
+                  Preimenuj
+                </button>
+                <label class="link upload-version" [class.upload--disabled]="busy()">
+                  Nova verzija
+                  <input type="file" (change)="newVersionSelected($event, file)" [disabled]="busy()" />
+                </label>
+              }
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}
