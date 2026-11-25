@@ -28,6 +28,7 @@ func (h *Handler) Routes() http.Handler {
 	mux.HandleFunc("PATCH /folders/{id}", h.renameFolder)
 	mux.HandleFunc("PATCH /files/{id}", h.renameFile)
 	mux.HandleFunc("POST /folders/{id}/files", h.uploadFile)
+	mux.HandleFunc("PUT /files/{id}/content", h.uploadNewVersion)
 	mux.HandleFunc("POST /internal/folders/root", h.createRootFolder)
 	return mux
 }
