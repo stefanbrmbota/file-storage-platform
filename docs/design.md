@@ -813,6 +813,7 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
 | `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
 | `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0). Identitet samo iz `X-User-ID`; bez heša lozinke. |
+| `POST /api/users/me/password` | Users | da | US-14 | Promena lozinke: `{currentPassword, newPassword, newPasswordConfirm}`. Nova lozinka mora biti jaka i različita od trenutne, a trenutna lozinka stara najmanje `PASSWORD_MIN_AGE` (podrazumevano 24h). Uspeh `204`, pa se token zahteva opoziva i korisnik se ponovo prijavljuje. Greške: `400` pravila lozinke, `403` pogrešna trenutna lozinka (namerno ne `401`), `409` prerano menjanje ili istovremena promena. |
 | `GET /api/auth/session` | gateway | da | US-32 | Odgovara sam gateway posle provere tokena i opoziva: `{userId, role}`. Klijent proverava da li sačuvan token još važi (npr. posle odjave u drugom tabu). |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
 | `GET /api/folders/{id}/contents` | Files | da | US-03 | Sadržaj foldera (podfolderi i datoteke). |

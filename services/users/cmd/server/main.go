@@ -119,6 +119,11 @@ func main() {
 	logout := service.NewLogoutService(tokens, revokedRepo)
 	quota := service.NewQuotaService(userRepo)
 	accounts := service.NewAccountService(userRepo)
+	passwords, err := service.NewPasswordService(userRepo, tokens, revokedRepo, params, cfg.PasswordMinAge)
+	if err != nil {
+		logger.Error("neispravna konfiguracija promene lozinke (ARGON2_*, PASSWORD_MIN_AGE)", "err", err)
+		os.Exit(1)
+	}
 
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
@@ -135,6 +140,8 @@ func main() {
 	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
 	// US-06: nalog i kvota prijavljenog korisnika; identitet dolazi iz X-User-ID (postavlja gateway).
 	mux.HandleFunc("GET /users/me", handler.MeHandler(accounts))
+	// US-14: promena lozinke prijavljenog korisnika; posle uspeha se opoziva token zahteva.
+	mux.HandleFunc("POST /users/me/password", handler.ChangePasswordHandler(passwords))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
 	mux.Handle("POST /internal/users/{id}/quota/reserve", internalOnly(handler.ReserveQuotaHandler(quota)))
 	mux.Handle("POST /internal/users/{id}/quota/release", internalOnly(handler.ReleaseQuotaHandler(quota)))

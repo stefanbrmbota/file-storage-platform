@@ -67,6 +67,8 @@ var All = []Route{
 	{"POST /api/auth/logout", Users, User},
 	// Users: nalog i admin (ADMIN uloga se proverava i u servisu).
 	{"GET /api/users/me", Users, User},
+	// Promena lozinke (US-14); Users posle uspeha opoziva token kojim je zahtev poslat.
+	{"POST /api/users/me/password", Users, User},
 	{"GET /api/admin/users", Users, Admin},
 
 	// Files: folderi, datoteke, pretraga.
