@@ -1,0 +1,55 @@
+<section class="profil">
+  <h1>Profil</h1>
+
+  @if (loading()) {
+    <p class="profil__info">Učitavam…</p>
+  }
+
+  @if (error()) {
+    <p class="profil__error" role="alert">{{ error() }}</p>
+    <p><button type="button" (click)="load()">Pokušaj ponovo</button></p>
+  }
+
+  @if (account(); as a) {
+    <dl class="profil__data">
+      <dt>Ime i prezime</dt>
+      <dd>{{ a.firstName }} {{ a.lastName }}</dd>
+      <dt>Email</dt>
+      <dd>{{ a.email }}</dd>
+      <dt>Uloga</dt>
+      <dd>{{ roleLabel() }}</dd>
+    </dl>
+
+    <h2>Kvota skladišta</h2>
+
+    <div
+      class="profil__bar"
+      role="progressbar"
+      aria-label="Zauzeće skladišta"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      [attr.aria-valuenow]="percent().toFixed(1)"
+    >
+      <div class="profil__fill" [class.profil__fill--high]="high()" [style.width.%]="percent()"></div>
+    </div>
+    <p class="profil__summary">
+      Zauzeto <strong>{{ formatSize(a.usedBytes) }}</strong> od <strong>{{ formatSize(a.quotaBytes) }}</strong>
+      ({{ percentLabel() }})
+    </p>
+
+    <dl class="profil__quota">
+      <div>
+        <dt>Kvota</dt>
+        <dd>{{ formatSize(a.quotaBytes) }}</dd>
+      </div>
+      <div>
+        <dt>Zauzeto</dt>
+        <dd>{{ formatSize(a.usedBytes) }}</dd>
+      </div>
+      <div>
+        <dt>Preostalo</dt>
+        <dd>{{ formatSize(a.remainingBytes) }}</dd>
+      </div>
+    </dl>
+  }
+</section>
