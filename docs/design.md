@@ -812,6 +812,7 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. |
 | `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
 | `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
+| `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0). Identitet samo iz `X-User-ID`; bez heša lozinke. |
 | `GET /api/auth/session` | gateway | da | US-32 | Odgovara sam gateway posle provere tokena i opoziva: `{userId, role}`. Klijent proverava da li sačuvan token još važi (npr. posle odjave u drugom tabu). |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
 | `GET /api/folders/{id}/contents` | Files | da | US-03 | Sadržaj foldera (podfolderi i datoteke). |
@@ -820,7 +821,6 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 
 | Metoda i putanja (gateway) | Servis | JWT | Opis |
 |---|---|---|---|
-| `GET /api/users/me` | Users | da | Podaci o nalogu, kvota i zauzeće. |
 | `GET /api/admin/users` | Users | ADMIN | Admin pregled korisnika (US-24). |
 | `PATCH /api/folders/{id}` | Files | da | Preimenovanje ili premeštanje foldera. |
 | `DELETE /api/folders/{id}` | Files | da | Brisanje foldera sa sadržajem. |
