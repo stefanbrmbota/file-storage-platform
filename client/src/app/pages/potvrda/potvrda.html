@@ -1,0 +1,27 @@
+<section class="potvrda">
+  <h1>Potvrda naloga</h1>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="potvrda__info">Potvrđujem nalog…</p>
+    }
+    @case ('done') {
+      <p class="potvrda__ok" role="status">Nalog je aktiviran. Sada se možete prijaviti.</p>
+      <p><a class="potvrda__button" routerLink="/prijava">Prijavi se</a></p>
+    }
+    @case ('missing') {
+      <p class="potvrda__error" role="alert">
+        Link za potvrdu nije ispravan. Otvorite link iz mejla u celosti ili se ponovo registrujte.
+      </p>
+      <p><a routerLink="/registracija">Registracija</a></p>
+    }
+    @case ('error') {
+      <p class="potvrda__error" role="alert">{{ error() }}</p>
+      @if (canRetry()) {
+        <p><button type="button" (click)="confirm()">Pokušaj ponovo</button></p>
+      } @else {
+        <p><a routerLink="/registracija">Registracija</a> · <a routerLink="/prijava">Prijava</a></p>
+      }
+    }
+  }
+</section>

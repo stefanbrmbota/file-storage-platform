@@ -30,6 +30,19 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/login/login').then((m) => m.Login),
       },
       {
+        // Registracija (T-04.5); prijavljen korisnik se vraca na pocetnu.
+        path: 'registracija',
+        canActivate: [guestGuard],
+        title: 'Registracija | File Storage',
+        loadComponent: () => import('./pages/registracija/registracija').then((m) => m.Registracija),
+      },
+      {
+        // Potvrda naloga: ovde vodi link iz mejla (/potvrda#token=...); javna, bez guard-a.
+        path: 'potvrda',
+        title: 'Potvrda naloga | File Storage',
+        loadComponent: () => import('./pages/potvrda/potvrda').then((m) => m.Potvrda),
+      },
+      {
         // PRIMER zasticene stranice za kopiranje (T-32.5, docs/klijent.md); nije u navigaciji.
         path: 'primer',
         canActivate: [authGuard],
