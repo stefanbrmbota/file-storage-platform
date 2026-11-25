@@ -1,0 +1,4 @@
+# Skripte koje se pokrecu u Linux kontejnerima moraju imati LF kraj reda i na
+# Windows-u (core.autocrlf=true ih inace pretvori u CRLF, pa kontejner javlja
+# "#!/bin/sh\r: not found"). Primer: client/docker/40-config-json.sh.
+*.sh text eol=lf
