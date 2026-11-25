@@ -95,6 +95,34 @@ func TestLoadConfirmationSettings(t *testing.T) {
 	})
 }
 
+func TestLoadPasswordMinAge(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevano 24h", func(t *testing.T) {
+		t.Setenv("PASSWORD_MIN_AGE", "")
+		cfg, err := Load()
+		if err != nil || cfg.PasswordMinAge != 24*time.Hour {
+			t.Fatalf("PasswordMinAge = %v, err = %v", cfg.PasswordMinAge, err)
+		}
+	})
+	t.Run("iz env (skracen period za demonstraciju)", func(t *testing.T) {
+		t.Setenv("PASSWORD_MIN_AGE", "1m")
+		cfg, err := Load()
+		if err != nil || cfg.PasswordMinAge != time.Minute {
+			t.Fatalf("PasswordMinAge = %v, err = %v", cfg.PasswordMinAge, err)
+		}
+	})
+	t.Run("neispravno", func(t *testing.T) {
+		for _, bad := range []string{"abc", "0s", "-1h"} {
+			t.Setenv("PASSWORD_MIN_AGE", bad)
+			if _, err := Load(); err == nil {
+				t.Errorf("%q: ocekivana greska", bad)
+			}
+		}
+	})
+}
+
 func TestLoadJWTSettings(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "")
 	t.Setenv("ADMIN_PASSWORD", "")
