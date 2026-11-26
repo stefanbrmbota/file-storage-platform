@@ -14,6 +14,7 @@ import (
 
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/client"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/model"
+	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/objectstore"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
 )
 
@@ -34,6 +35,7 @@ type FileWriter interface {
 type ObjectStore interface {
 	Put(ctx context.Context, key string, content io.Reader, size int64, contentType string) error
 	Delete(ctx context.Context, key string) error
+	Get(ctx context.Context, key string) (*objectstore.Object, error)
 }
 
 // QuotaClient reserves and releases storage space (client.UsersClient).
