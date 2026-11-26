@@ -1,0 +1,64 @@
+<section class="pl">
+  @if (done()) {
+    <h1>Lozinka je promenjena</h1>
+    <p class="pl__ok" role="status">
+      Zbog bezbednosti si odjavljen. Prijavi se novom lozinkom.
+    </p>
+    <p><a class="pl__button" routerLink="/prijava">Prijavi se</a></p>
+  } @else {
+    <h1>Promena lozinke</h1>
+
+    @if (error()) {
+      <p class="pl__error" role="alert">{{ error() }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <label>
+        Trenutna lozinka
+        <input type="password" formControlName="currentPassword" autocomplete="current-password" autofocus />
+      </label>
+      @if (form.controls.currentPassword.touched && form.controls.currentPassword.invalid) {
+        <small class="pl__hint">Unesi trenutnu lozinku.</small>
+      }
+
+      <label>
+        Nova lozinka
+        <input type="password" formControlName="newPassword" autocomplete="new-password" />
+      </label>
+      @if (form.controls.newPassword.touched && form.controls.newPassword.errors; as e) {
+        <small class="pl__hint">
+          @if (e['required']) {
+            Unesi novu lozinku.
+          } @else {
+            Lozinka mora imati:
+            <ul>
+              @if (e['minlength']) { <li>najmanje 8 karaktera</li> }
+              @if (e['maxlength']) { <li>najviše 128 karaktera</li> }
+              @if (e['upper']) { <li>veliko slovo</li> }
+              @if (e['lower']) { <li>malo slovo</li> }
+              @if (e['digit']) { <li>broj</li> }
+              @if (e['special']) { <li>specijalni znak</li> }
+            </ul>
+          }
+        </small>
+      }
+      @if (form.controls.newPassword.touched && form.errors?.['same']) {
+        <small class="pl__hint">Nova lozinka mora biti drugačija od trenutne.</small>
+      }
+
+      <label>
+        Ponovljena nova lozinka
+        <input type="password" formControlName="newPasswordConfirm" autocomplete="new-password" />
+      </label>
+      @if (form.controls.newPasswordConfirm.touched && form.controls.newPasswordConfirm.errors?.['required']) {
+        <small class="pl__hint">Ponovi novu lozinku.</small>
+      } @else if (form.controls.newPasswordConfirm.touched && form.errors?.['mismatch']) {
+        <small class="pl__hint">Lozinke se ne poklapaju.</small>
+      }
+
+      <button type="submit" [disabled]="busy()">{{ busy() ? 'Menjam…' : 'Promeni lozinku' }}</button>
+    </form>
+
+    <p class="pl__alt"><a routerLink="/profil">Nazad na profil</a></p>
+  }
+</section>
