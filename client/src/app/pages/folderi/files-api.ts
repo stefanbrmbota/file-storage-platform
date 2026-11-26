@@ -88,7 +88,8 @@ function formWith(file: File): FormData {
 
 /**
  * Ista pravila za naziv kao na serveru (validacija i na klijentu, IB 2.18):
- * obavezan, najviše 255 znakova, bez / i \ i bez imena "." i "..".
+ * obavezan, najviše 255 znakova, bez / i \, bez specijalnih znakova <>:"|?*
+ * (US-64) i bez imena "." i "..".
  * Vraća poruku greške ili null ako je naziv ispravan.
  */
 export function validateName(raw: string): string | null {
@@ -97,6 +98,7 @@ export function validateName(raw: string): string | null {
   if (name === '.' || name === '..') return 'Naziv ne može biti "." ili "..".';
   if ([...name].length > 255) return 'Naziv može imati najviše 255 znakova.';
   if (/[/\\]/.test(name)) return 'Naziv ne sme da sadrži / ni \\.';
+  if (/[<>:"|?*]/.test(name)) return 'Naziv ne sme da sadrži znakove < > : " | ? *.';
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u001f\u007f]/.test(name)) return 'Naziv ne sme da sadrži kontrolne znakove.';
   return null;
@@ -113,4 +115,12 @@ export function formatSize(bytes: number): string {
     unit++;
   }
   return `${value.toFixed(1)} ${units[unit]}`;
+}
+
+/** Id foldera ili datoteke je UUID kakav pravi Files servis (whitelist, US-64). */
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Da li je id iz adrese ispravan: "root" ili UUID. */
+export function isValidFolderId(id: string): boolean {
+  return id === 'root' || UUID.test(id);
 }
