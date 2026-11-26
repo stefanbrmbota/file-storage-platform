@@ -19,6 +19,9 @@
       <dt>Uloga</dt>
       <dd>{{ roleLabel() }}</dd>
     </dl>
+    @if (a.role === 'ADMIN') {
+      <p><a routerLink="/admin">Administracija</a></p>
+    }
 
     <h2>Lozinka</h2>
     @if (password(); as p) {

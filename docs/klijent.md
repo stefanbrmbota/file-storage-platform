@@ -254,6 +254,16 @@ Klijent ne šalje nikakav ID korisnika: identitet određuje gateway iz tokena.
 Odluku administratora (US-23) korisnik vidi kad ponovo otvori `/profil`; trenutna
 kvota na kartici se menja tek tada.
 
+## 3.14 Administracija (US-22, T-22.4)
+
+Zaštićena stranica `/admin` (`pages/admin/`), samo za administratora:
+
+- **Zahtevi za kvotu** (`GET /api/admin/quota-requests`): podnosilac, email, trenutna i tražena kvota, status i vreme podnošenja; prvo oni na čekanju.
+- **Korisnici** (`GET /api/admin/users`): ime i prezime, email, kvota i zauzeće; oznake za administratora i neaktivan nalog.
+- Svaka lista se učitava i ponavlja nezavisno, pa greška jedne ne skriva drugu.
+
+Ruta ima `canActivate: [authGuard, adminGuard]`. `adminGuard` (`pages/admin/admin.guard.ts`) čita ulogu iz tokena i običnog korisnika vraća na početnu; to je samo olakšanje za korisnika, a pravo pristupa stvarno proveravaju gateway (`role = ADMIN`) i Users servis (uloga iz baze). Link „Administracija“ je na `/profil` i vidi ga samo administrator; stavka u glavnom meniju nije dodata jer `layout/` zahteva dogovor sa AP.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.
