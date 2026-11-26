@@ -44,6 +44,10 @@ type Config struct {
 
 	PasswordMinAge time.Duration // najkrace vreme od poslednje promene lozinke do sledece (US-14)
 
+	ResetURLBase          string        // klijentska stranica za reset lozinke; token ide u #fragment (US-15)
+	PasswordResetTTL      time.Duration // rok vazenja linka za reset lozinke
+	PasswordResetCooldown time.Duration // najkrace vreme izmedju dva mejla za reset istom korisniku
+
 	InternalToken string // deljena tajna za interne pozive (X-Internal-Token); nikad se ne loguje
 }
 
@@ -64,6 +68,7 @@ func Load() (Config, error) {
 		SMTPUser:          os.Getenv("SMTP_USER"),
 		SMTPPassword:      os.Getenv("SMTP_PASSWORD"),
 		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/potvrda"),
+		ResetURLBase:      getEnv("RESET_URL_BASE", "http://localhost:3000/reset-lozinke"),
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
 		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
@@ -105,6 +110,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.PasswordMinAge, err = getDuration("PASSWORD_MIN_AGE", 24*time.Hour); err != nil {
+		return Config{}, err
+	}
+	if cfg.PasswordResetTTL, err = getDuration("PASSWORD_RESET_TTL", 15*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.PasswordResetCooldown, err = getDuration("PASSWORD_RESET_COOLDOWN", time.Minute); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
