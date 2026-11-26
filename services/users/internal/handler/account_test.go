@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/service"
@@ -40,6 +41,7 @@ func sampleAccount() service.Account {
 	return service.Account{
 		ID: "u1", FirstName: "Ana", LastName: "Anić", Email: "ana@example.com",
 		Role: model.RoleUser, QuotaBytes: 1000, UsedBytes: 250, RemainingBytes: 750,
+		PasswordExpiresAt: time.Date(2027, 1, 25, 12, 0, 0, 0, time.UTC),
 	}
 }
 
@@ -66,6 +68,7 @@ func TestMeHandler_Success(t *testing.T) {
 	want := map[string]any{
 		"id": "u1", "firstName": "Ana", "lastName": "Anić", "email": "ana@example.com", "role": "USER",
 		"quotaBytes": float64(1000), "usedBytes": float64(250), "remainingBytes": float64(750),
+		"passwordExpiresAt": "2027-01-25T12:00:00Z",
 	}
 	if len(body) != len(want) {
 		t.Errorf("polja = %v, ocekivano tacno %d", body, len(want))

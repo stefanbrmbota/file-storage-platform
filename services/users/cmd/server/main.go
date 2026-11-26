@@ -118,7 +118,11 @@ func main() {
 	}
 	logout := service.NewLogoutService(tokens, revokedRepo)
 	quota := service.NewQuotaService(userRepo)
-	accounts := service.NewAccountService(userRepo)
+	accounts, err := service.NewAccountService(userRepo, cfg.PasswordMaxAge)
+	if err != nil {
+		logger.Error("neispravna konfiguracija podataka o nalogu (PASSWORD_MAX_AGE)", "err", err)
+		os.Exit(1)
+	}
 	passwords, err := service.NewPasswordService(userRepo, tokens, revokedRepo, params, cfg.PasswordMinAge)
 	if err != nil {
 		logger.Error("neispravna konfiguracija promene lozinke (ARGON2_*, PASSWORD_MIN_AGE)", "err", err)
