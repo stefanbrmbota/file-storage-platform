@@ -21,7 +21,11 @@ describe('Rutiranje i zasticene rute (T-32.2, T-32.4)', () => {
     http = TestBed.inject(HttpTestingController);
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    // Zaglavlje prijavljenog korisnika pita za broj neprocitanih obavestenja (T-08.2).
+    http.match((r) => r.url.endsWith('/api/notifications/unread-count')).forEach((r) => r.flush({ count: 0 }));
+    http.verify();
+  });
 
   const login = () =>
     TestBed.inject(TokenService).set(fakeJwt({ sub: 'u1', role: 'USER', exp: Math.floor(Date.now() / 1000) + 900 }));
@@ -88,6 +92,19 @@ describe('Rutiranje i zasticene rute (T-32.2, T-32.4)', () => {
     await harness.navigateByUrl('/');
     http.expectNone('http://gw.test/api/auth/session'); // vec potvrdjen
     http.expectOne('http://gw.test/health').flush({ status: 'ok' });
+  });
+
+  it('zaglavlje prikazuje broj neprocitanih obavestenja (T-08.2)', async () => {
+    login();
+    const harness = await openLoggedIn('/');
+    http.expectOne('http://gw.test/health').flush({ status: 'ok' });
+    http.match((r) => r.url.endsWith('/api/notifications/unread-count')).forEach((r) => r.flush({ count: 3 }));
+    harness.detectChanges();
+
+    const link = Array.from((harness.fixture.nativeElement as HTMLElement).querySelectorAll('nav a')).find((a) =>
+      a.textContent?.includes('Obaveštenja'),
+    );
+    expect(link?.querySelector('.badge')?.textContent?.trim()).toBe('3');
   });
 
   it('nepostojeca adresa prikazuje 404, a zaglavlje ostaje', async () => {

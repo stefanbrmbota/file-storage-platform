@@ -1,0 +1,33 @@
+<h1>Obaveštenja</h1>
+
+@if (loading()) {
+  <p class="muted">Učitavam…</p>
+} @else if (error() && items().length === 0) {
+  <p class="error" role="alert">{{ error() }}</p>
+} @else if (items().length === 0) {
+  <p class="muted empty">Nemaš obaveštenja.</p>
+} @else {
+  <ul class="list">
+    @for (n of items(); track n.id) {
+      <li class="item" [class.item--unread]="!n.isRead">
+        <div class="item__head">
+          <span class="item__type">{{ typeLabel(n.type) }}</span>
+          @if (!n.isRead) {
+            <span class="item__new">novo</span>
+          }
+          <time class="item__time" [attr.datetime]="n.createdAt">{{ formatTime(n.createdAt) }}</time>
+        </div>
+        <p class="item__message">{{ n.message }}</p>
+      </li>
+    }
+  </ul>
+
+  @if (error()) {
+    <p class="error" role="alert">{{ error() }}</p>
+  }
+  @if (nextCursor()) {
+    <button type="button" class="more" (click)="loadMore()" [disabled]="loadingMore()">
+      {{ loadingMore() ? 'Učitavam…' : 'Učitaj još' }}
+    </button>
+  }
+}

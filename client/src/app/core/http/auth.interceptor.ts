@@ -1,4 +1,4 @@
-import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
@@ -9,6 +9,13 @@ import { apiErrorMessage } from './api-error';
 
 /** Putanja stranice za prijavu (T-32.4). */
 export const LOGIN_PATH = '/prijava';
+
+/**
+ * Zahtev sa ovom oznakom ne prikazuje greske servera u traci (npr. bedz sa
+ * brojem neprocitanih, koji ne treba da vice na svakoj stranici).
+ * Upotreba: http.get(url, { context: new HttpContext().set(SILENT_ERRORS, true) }).
+ */
+export const SILENT_ERRORS = new HttpContextToken<boolean>(() => false);
 
 /** Provera sesije (GET /api/auth/session), koju zove guard. */
 export const SESSION_PATH = '/api/auth/session';
@@ -54,7 +61,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
             const returnUrl = router.url.startsWith(LOGIN_PATH) ? undefined : router.url;
             void router.navigate([LOGIN_PATH], { queryParams: returnUrl ? { returnUrl } : {} });
           }
-        } else if (err.status === 0 || err.status >= 500) {
+        } else if ((err.status === 0 || err.status >= 500) && !req.context.get(SILENT_ERRORS)) {
           banner.show(apiErrorMessage(err));
         }
       }

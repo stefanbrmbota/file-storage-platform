@@ -1,8 +1,11 @@
-import { Component, inject, signal } from '@angular/core';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Component, DestroyRef, effect, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { filter } from 'rxjs';
 import { ErrorBannerService } from '../core/notify/error-banner.service';
 import { TokenService } from '../core/auth/token.service';
 import { AuthService } from '../core/auth/auth.service';
+import { NotificationsService } from '../core/notifications/notifications.service';
 
 /** Stavka glavne navigacije u zaglavlju. */
 export interface NavItem {
@@ -27,7 +30,11 @@ export class Shell {
     { label: 'Početna', path: '/' },
     { label: 'Moji fajlovi', path: '/folderi' },
     { label: 'Profil', path: '/profil' },
+    { label: 'Obaveštenja', path: '/obavestenja' },
   ];
+
+  /** Putanja stavke uz koju se prikazuje broj neprocitanih (T-08.2). */
+  protected readonly notificationsPath = '/obavestenja';
 
   /** Poruka o gresci na vrhu stranice (T-32.3). */
   protected readonly errors = inject(ErrorBannerService);
@@ -36,6 +43,32 @@ export class Shell {
   protected readonly tokens = inject(TokenService);
   private readonly auth = inject(AuthService);
   protected readonly loggingOut = signal(false);
+
+  /** Broj neprocitanih obavestenja za bedz (T-08.2). */
+  private readonly notifications = inject(NotificationsService);
+  protected readonly unread = this.notifications.unreadCount;
+
+  constructor() {
+    // Posle prijave ucitaj broj neprocitanih, posle odjave ga obrisi.
+    effect(() => {
+      if (this.tokens.isAuthenticated()) {
+        this.notifications.refreshUnread();
+      } else {
+        this.notifications.reset();
+      }
+    });
+    // Pri prelasku na drugu stranicu osvezi broj (bez stalnog proveravanja u pozadini).
+    inject(Router)
+      .events.pipe(
+        filter((e) => e instanceof NavigationEnd),
+        takeUntilDestroyed(inject(DestroyRef)),
+      )
+      .subscribe(() => {
+        if (this.tokens.isAuthenticated()) {
+          this.notifications.refreshUnread();
+        }
+      });
+  }
 
   protected logout(): void {
     this.loggingOut.set(true);
