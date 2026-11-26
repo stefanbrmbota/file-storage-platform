@@ -171,6 +171,8 @@ func main() {
 	quotaRequests := service.NewQuotaRequestService(userRepo, quotaRequestRepo)
 	// US-22: administratorski pregled korisnika i zahteva za kvotu.
 	admin := service.NewAdminService(userRepo, userRepo, quotaRequestRepo)
+	// US-23: odobravanje i odbijanje zahteva za kvotu.
+	quotaDecisions := service.NewQuotaDecisionService(userRepo, quotaRequestRepo)
 
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
@@ -193,6 +195,9 @@ func main() {
 	// US-22: admin pregled; gateway propusta samo ulogu ADMIN, a servis ulogu proverava i u bazi.
 	mux.HandleFunc("GET /admin/users", handler.AdminUsersHandler(admin))
 	mux.HandleFunc("GET /admin/quota-requests", handler.AdminQuotaRequestsHandler(admin))
+	// US-23: odluka o zahtevu; ista zastita kao za pregled (gateway ADMIN + uloga iz baze u servisu).
+	mux.HandleFunc("POST /admin/quota-requests/{id}/approve", handler.ApproveQuotaRequestHandler(quotaDecisions))
+	mux.HandleFunc("POST /admin/quota-requests/{id}/reject", handler.RejectQuotaRequestHandler(quotaDecisions))
 	// US-14: promena lozinke prijavljenog korisnika; posle uspeha se opoziva token zahteva.
 	mux.HandleFunc("POST /users/me/password", handler.ChangePasswordHandler(passwords))
 	// US-15: reset zaboravljene lozinke mejlom; javne rute (gateway ih ne trazi JWT).
