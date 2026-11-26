@@ -145,6 +145,23 @@ func main() {
 		os.Exit(1)
 	}
 
+	// US-17: povracaj naloga magicnim linkom.
+	magicRepo, err := repository.NewMagicLinkRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("magic link repository init failed", "err", err)
+		os.Exit(1)
+	}
+	magicLink, err := service.NewMagicLinkService(userRepo, magicRepo, mailer, service.MagicLinkConfig{
+		BaseURL:  cfg.MagicLinkURLBase,
+		TTL:      cfg.MagicLinkTTL,
+		Cooldown: cfg.MagicLinkCooldown,
+	})
+	if err != nil {
+		logger.Error("neispravna konfiguracija magicnog linka (MAGIC_LINK_URL_BASE, MAGIC_LINK_*)", "err", err)
+		os.Exit(1)
+	}
+	magicLogin := service.NewMagicLoginService(userRepo, magicRepo, tokens)
+
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
 	if err != nil {
@@ -165,6 +182,9 @@ func main() {
 	// US-15: reset zaboravljene lozinke mejlom; javne rute (gateway ih ne trazi JWT).
 	mux.HandleFunc("POST /password-reset/request", handler.PasswordResetRequestHandler(passwordReset))
 	mux.HandleFunc("POST /password-reset/confirm", handler.PasswordResetConfirmHandler(passwordReset))
+	// US-17: povracaj naloga magicnim linkom; javne rute (korisnik nije prijavljen).
+	mux.HandleFunc("POST /magic-link/request", handler.MagicLinkRequestHandler(magicLink))
+	mux.HandleFunc("POST /magic-link/login", handler.MagicLinkLoginHandler(magicLogin))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
 	mux.Handle("POST /internal/users/{id}/quota/reserve", internalOnly(handler.ReserveQuotaHandler(quota)))
 	mux.Handle("POST /internal/users/{id}/quota/release", internalOnly(handler.ReleaseQuotaHandler(quota)))
