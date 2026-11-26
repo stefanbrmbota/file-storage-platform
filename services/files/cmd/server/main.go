@@ -19,6 +19,8 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/objectstore"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/files/internal/service"
+
+	"github.com/stefanbrmbota/file-storage-platform/pkg/reqlog"
 )
 
 func main() {
@@ -73,7 +75,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           handler.New(folders, files, cfg.MaxUploadBytes).WithInternalToken(cfg.InternalToken).Routes(),
+		Handler:           reqlog.RejectedInput(logger, handler.New(folders, files, cfg.MaxUploadBytes).WithInternalToken(cfg.InternalToken).Routes()),
 		ReadHeaderTimeout: 5 * time.Second,
 		// Uploads (and later downloads) of big files take time. WriteTimeout
 		// counts from the end of the request headers to the end of the
