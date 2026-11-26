@@ -121,6 +121,8 @@ func writeUploadError(w http.ResponseWriter, err error) {
 		writeError(w, http.StatusServiceUnavailable, service.ErrQuotaUnavailable.Error())
 	case errors.Is(err, service.ErrInvalidSize):
 		writeError(w, http.StatusBadRequest, err.Error())
+	case errors.Is(err, service.ErrFileTypeNotAllowed):
+		writeError(w, http.StatusUnsupportedMediaType, err.Error())
 	default:
 		writeFolderError(w, err)
 	}

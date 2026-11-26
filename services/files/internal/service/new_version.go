@@ -54,6 +54,13 @@ func (s *FileService) UploadNewVersion(ctx context.Context, in NewVersionInput) 
 		return nil, err
 	}
 
+	// Nova verzija mora biti istog, dozvoljenog tipa kao naziv datoteke (US-65).
+	contentType, content, err := s.types.Check(file.Name, in.Content)
+	if err != nil {
+		return nil, err
+	}
+	in.ContentType, in.Content = contentType, content
+
 	// Step 2: only the difference counts. A file that grows from 10 MB to
 	// 12 MB needs 2 MB more; one that shrinks needs nothing reserved.
 	diff := in.Size - file.Size

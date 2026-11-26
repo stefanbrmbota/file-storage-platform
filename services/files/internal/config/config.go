@@ -3,6 +3,7 @@ package config
 import (
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -21,22 +22,25 @@ type Config struct {
 	InternalToken   string // shared secret for internal calls (X-Internal-Token); never logged
 	RequestTimeout  time.Duration
 	MaxUploadBytes  int64
+	// AllowedExtensions je whitelist ekstenzija za otpremanje (US-65); prazno = svi poznati tipovi.
+	AllowedExtensions []string
 }
 
 func Load() Config {
 	return Config{
-		Port:            getEnv("FILES_PORT", "8082"),
-		MongoURI:        getEnv("FILES_MONGO_URI", "mongodb://localhost:27017"),
-		MongoDB:         getEnv("FILES_MONGO_DB", "files"),
-		MinioEndpoint:   getEnv("MINIO_ENDPOINT", "localhost:9000"),
-		MinioAccessKey:  os.Getenv("MINIO_ACCESS_KEY"),
-		MinioSecretKey:  os.Getenv("MINIO_SECRET_KEY"),
-		MinioBucket:     getEnv("MINIO_BUCKET", "files"),
-		MinioUseSSL:     os.Getenv("MINIO_USE_SSL") == "true",
-		UsersServiceURL: getEnv("USERS_SERVICE_URL", "http://localhost:8081"),
-		InternalToken:   os.Getenv("INTERNAL_TOKEN"),
-		RequestTimeout:  getDuration("FILES_REQUEST_TIMEOUT", 5*time.Second),
-		MaxUploadBytes:  getInt64("FILES_MAX_UPLOAD_BYTES", 100<<20), // 100 MB
+		Port:              getEnv("FILES_PORT", "8082"),
+		MongoURI:          getEnv("FILES_MONGO_URI", "mongodb://localhost:27017"),
+		MongoDB:           getEnv("FILES_MONGO_DB", "files"),
+		MinioEndpoint:     getEnv("MINIO_ENDPOINT", "localhost:9000"),
+		MinioAccessKey:    os.Getenv("MINIO_ACCESS_KEY"),
+		MinioSecretKey:    os.Getenv("MINIO_SECRET_KEY"),
+		MinioBucket:       getEnv("MINIO_BUCKET", "files"),
+		MinioUseSSL:       os.Getenv("MINIO_USE_SSL") == "true",
+		UsersServiceURL:   getEnv("USERS_SERVICE_URL", "http://localhost:8081"),
+		InternalToken:     os.Getenv("INTERNAL_TOKEN"),
+		RequestTimeout:    getDuration("FILES_REQUEST_TIMEOUT", 5*time.Second),
+		MaxUploadBytes:    getInt64("FILES_MAX_UPLOAD_BYTES", 100<<20), // 100 MB
+		AllowedExtensions: strings.Split(os.Getenv("FILES_ALLOWED_EXTENSIONS"), ","),
 	}
 }
 

@@ -35,7 +35,7 @@
 
     <label class="upload" [class.upload--disabled]="busy()">
       Otpremi fajl
-      <input type="file" (change)="uploadSelected($event)" [disabled]="busy()" />
+      <input type="file" [accept]="accept" (change)="uploadSelected($event)" [disabled]="busy()" />
     </label>
   </div>
 
@@ -120,7 +120,7 @@
                 </button>
                 <label class="link upload-version" [class.upload--disabled]="busy()">
                   Nova verzija
-                  <input type="file" (change)="newVersionSelected($event, file)" [disabled]="busy()" />
+                  <input type="file" [accept]="accept" (change)="newVersionSelected($event, file)" [disabled]="busy()" />
                 </label>
               }
             </td>
