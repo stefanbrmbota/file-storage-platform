@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { Shell } from './layout/shell';
 import { authGuard, guestGuard } from './core/auth/auth.guard';
+import { adminGuard } from './pages/admin/admin.guard';
 
 /**
  * Rute klijenta (T-32.2). Sve stranice su deca rasporeda Shell, pa dobijaju
@@ -88,6 +89,13 @@ export const routes: Routes = [
         canActivate: [authGuard],
         title: 'Primer | File Storage',
         loadComponent: () => import('./pages/primer/primer').then((m) => m.Primer),
+      },
+      {
+        // Administracija: korisnici i zahtevi za kvotu (US-22, T-22.4); samo za administratora.
+        path: 'admin',
+        canActivate: [authGuard, adminGuard],
+        title: 'Administracija | File Storage',
+        loadComponent: () => import('./pages/admin/admin').then((m) => m.Admin),
       },
       {
         // Folderi i datoteke (SB): /folderi je korenski folder, /folderi/:id bilo koji drugi.

@@ -155,6 +155,14 @@ describe('Profil (kvota i zauzece)', () => {
     expect(el.textContent).toContain('Administrator');
   });
 
+  it('link „Administracija“ vidi samo administrator (US-22)', () => {
+    expect(render(account({ role: 'ADMIN' })).querySelector('a[href="/admin"]')?.textContent).toContain('Administracija');
+
+    TestBed.resetTestingModule();
+    setupTestBed();
+    expect(render(account({ role: 'USER' })).querySelector('a[href="/admin"]')).toBeNull();
+  });
+
   it('podaci sa servera se prikazuju kao tekst (bez HTML-a)', () => {
     const el = render(account({ firstName: '<img src=x onerror=alert(1)>', lastName: '<b>Zlo</b>' }));
     expect(el.querySelector('img')).toBeNull();

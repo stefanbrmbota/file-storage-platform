@@ -1,0 +1,89 @@
+<section class="admin">
+  <h1>Administracija</h1>
+
+  <h2>Zahtevi za kvotu</h2>
+  @if (requestsLoading()) {
+    <p class="admin__info">Učitavam…</p>
+  } @else if (requestsError()) {
+    <p class="admin__error" role="alert">{{ requestsError() }}</p>
+    <p><button type="button" (click)="loadRequests()">Pokušaj ponovo</button></p>
+  } @else if (requests().length === 0) {
+    <p class="admin__info">Nema zahteva za kvotu.</p>
+  } @else {
+    <div class="admin__scroll">
+      <table class="admin__requests">
+        <thead>
+          <tr>
+            <th>Podnosilac</th>
+            <th>Email</th>
+            <th>Trenutna kvota</th>
+            <th>Tražena kvota</th>
+            <th>Status</th>
+            <th>Podnet</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (r of requests(); track r.id) {
+            <tr>
+              <td>{{ requester(r) }}</td>
+              <td>{{ r.email }}</td>
+              <td>{{ r.email ? formatSize(r.currentQuotaBytes) : '' }}</td>
+              <td>{{ formatSize(r.requestedBytes) }}</td>
+              <td>
+                <span
+                  class="admin__status"
+                  [class.admin__status--pending]="r.status === 'PENDING'"
+                  [class.admin__status--approved]="r.status === 'APPROVED'"
+                  [class.admin__status--rejected]="r.status === 'REJECTED'"
+                  >{{ statusLabel(r.status) }}</span
+                >
+              </td>
+              <td>{{ r.createdAt | date: 'dd.MM.yyyy. HH:mm' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+
+  <h2>Korisnici</h2>
+  @if (usersLoading()) {
+    <p class="admin__info">Učitavam…</p>
+  } @else if (usersError()) {
+    <p class="admin__error" role="alert">{{ usersError() }}</p>
+    <p><button type="button" (click)="loadUsers()">Pokušaj ponovo</button></p>
+  } @else if (users().length === 0) {
+    <p class="admin__info">Nema korisnika.</p>
+  } @else {
+    <div class="admin__scroll">
+      <table class="admin__users">
+        <thead>
+          <tr>
+            <th>Ime i prezime</th>
+            <th>Email</th>
+            <th>Kvota</th>
+            <th>Zauzeće</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (u of users(); track u.id) {
+            <tr>
+              <td>
+                {{ u.firstName }} {{ u.lastName }}
+                @if (u.role === 'ADMIN') {
+                  <span class="admin__tag">admin</span>
+                }
+                @if (!u.active) {
+                  <span class="admin__tag admin__tag--inactive">neaktivan</span>
+                }
+              </td>
+              <td>{{ u.email }}</td>
+              <td>{{ formatSize(u.quotaBytes) }}</td>
+              <td>{{ formatSize(u.usedBytes) }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</section>
