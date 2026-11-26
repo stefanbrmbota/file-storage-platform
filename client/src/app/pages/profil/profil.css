@@ -88,3 +88,39 @@ button {
   font-weight: 600;
   cursor: pointer;
 }
+
+.profil__password {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+
+.profil__password p {
+  margin: 0;
+}
+
+.profil__password-text {
+  color: var(--muted);
+}
+
+.profil__password--warn {
+  border-color: #bf8700;
+  background: #fff8c5;
+}
+
+.profil__password--warn .profil__password-text {
+  color: #7d4e00;
+  font-weight: 600;
+}
+
+.profil__password--expired {
+  border-color: var(--danger);
+  background: #ffebe9;
+}
+
+.profil__password--expired .profil__password-text {
+  color: var(--danger);
+  font-weight: 600;
+}

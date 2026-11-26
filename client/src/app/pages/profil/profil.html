@@ -19,6 +19,21 @@
       <dt>Uloga</dt>
       <dd>{{ roleLabel() }}</dd>
     </dl>
+
+    <h2>Lozinka</h2>
+    @if (password(); as p) {
+      <div
+        class="profil__password"
+        [class.profil__password--warn]="p.level === 'warn'"
+        [class.profil__password--expired]="p.level === 'expired'"
+        [attr.role]="p.level === 'ok' ? null : 'alert'"
+      >
+        <p class="profil__password-date">
+          Lozinka važi do <strong>{{ p.expiresAt | date: 'dd.MM.yyyy. HH:mm' }}</strong>
+        </p>
+        <p class="profil__password-text">{{ p.text }}</p>
+      </div>
+    }
     <p><a routerLink="/promena-lozinke">Promeni lozinku</a></p>
 
     <h2>Kvota skladišta</h2>

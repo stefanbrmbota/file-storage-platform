@@ -193,6 +193,12 @@ prikazuju funkcijom `formatSize` iz `pages/folderi/files-api.ts`, pa su brojevi 
 kao u „Moji fajlovi“. Podaci se učitavaju pri otvaranju stranice, pa se zauzeće
 posle otpremanja vidi tek kad se `/profil` ponovo otvori.
 
+Rok lozinke (US-16, T-16.4): profil prikazuje „Lozinka važi do …“ i koliko je ostalo
+(`passwordExpiresAt` iz `GET /api/users/me`). U poslednjih 7 dana okvir je žut, a ako je
+lozinka istekla (token izdat pre isteka još važi) crven, uz poziv da se lozinka odmah
+promeni; posle odjave prijava nije moguća dok se lozinka ne postavi preko „Zaboravio si
+lozinku?“. Ako server ne pošalje rok, odeljak se ne prikazuje.
+
 ## 3.10 Promena lozinke (US-14, T-14.4)
 
 Zaštićena stranica `/promena-lozinke` (link „Promeni lozinku“ na `/profil`, `pages/promena-lozinke/`)
