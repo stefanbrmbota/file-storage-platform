@@ -63,6 +63,8 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 		{"POST", "/api/auth/login/verify", Users, "/login/verify"},
 		{"POST", "/api/auth/password-reset/request", Users, "/password-reset/request"},
 		{"POST", "/api/auth/password-reset/confirm", Users, "/password-reset/confirm"},
+		{"POST", "/api/auth/magic-link/request", Users, "/magic-link/request"},
+		{"POST", "/api/auth/magic-link/login", Users, "/magic-link/login"},
 		{"POST", "/api/auth/logout", Users, "/logout"},
 		{"GET", "/api/users/me", Users, "/users/me"},
 		{"POST", "/api/users/me/password", Users, "/users/me/password"},
@@ -114,6 +116,7 @@ func TestAccessLevels(t *testing.T) {
 		"POST /api/auth/register": true, "POST /api/auth/confirm": true,
 		"POST /api/auth/login": true, "POST /api/auth/login/verify": true,
 		"POST /api/auth/password-reset/request": true, "POST /api/auth/password-reset/confirm": true,
+		"POST /api/auth/magic-link/request": true, "POST /api/auth/magic-link/login": true,
 	}
 	admin := map[string]bool{"GET /api/admin/users": true}
 
