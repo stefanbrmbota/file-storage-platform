@@ -105,9 +105,9 @@ func main() {
 		logger.Error("neispravna JWT konfiguracija (JWT_SECRET, JWT_TTL)", "err", err)
 		os.Exit(1)
 	}
-	login, err := service.NewLoginService(userRepo, otpService, tokens, mailer, cfg.OTPTTL, params)
+	login, err := service.NewLoginService(userRepo, otpService, tokens, mailer, cfg.OTPTTL, params, cfg.PasswordMaxAge)
 	if err != nil {
-		logger.Error("login servis init failed", "err", err)
+		logger.Error("login servis init failed (PASSWORD_MAX_AGE)", "err", err)
 		os.Exit(1)
 	}
 

@@ -95,6 +95,46 @@ func TestLoadConfirmationSettings(t *testing.T) {
 	})
 }
 
+func TestLoadPasswordMaxAge(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevano 60 dana", func(t *testing.T) {
+		t.Setenv("PASSWORD_MAX_AGE", "")
+		t.Setenv("PASSWORD_MIN_AGE", "")
+		cfg, err := Load()
+		if err != nil || cfg.PasswordMaxAge != 60*24*time.Hour {
+			t.Fatalf("PasswordMaxAge = %v, err = %v", cfg.PasswordMaxAge, err)
+		}
+	})
+	t.Run("iz env (skracen period za demonstraciju)", func(t *testing.T) {
+		t.Setenv("PASSWORD_MAX_AGE", "2m")
+		t.Setenv("PASSWORD_MIN_AGE", "1m")
+		cfg, err := Load()
+		if err != nil || cfg.PasswordMaxAge != 2*time.Minute || cfg.PasswordMinAge != time.Minute {
+			t.Fatalf("max = %v, min = %v, err = %v", cfg.PasswordMaxAge, cfg.PasswordMinAge, err)
+		}
+	})
+	t.Run("neispravno trajanje", func(t *testing.T) {
+		t.Setenv("PASSWORD_MIN_AGE", "")
+		for _, bad := range []string{"abc", "0s", "-1h"} {
+			t.Setenv("PASSWORD_MAX_AGE", bad)
+			if _, err := Load(); err == nil {
+				t.Errorf("%q: ocekivana greska", bad)
+			}
+		}
+	})
+	t.Run("mora biti duze od najmanje starosti", func(t *testing.T) {
+		for _, c := range [][2]string{{"1h", "24h"}, {"24h", "24h"}, {"2m", "2m"}} {
+			t.Setenv("PASSWORD_MAX_AGE", c[0])
+			t.Setenv("PASSWORD_MIN_AGE", c[1])
+			if _, err := Load(); err == nil {
+				t.Errorf("max=%s min=%s: ocekivana greska", c[0], c[1])
+			}
+		}
+	})
+}
+
 func TestLoadPasswordMinAge(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "")
 	t.Setenv("ADMIN_PASSWORD", "")

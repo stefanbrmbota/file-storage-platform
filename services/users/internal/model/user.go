@@ -58,3 +58,20 @@ func NewAdmin(id, firstName, lastName, email, passwordHash string, quotaBytes in
 	u.Active = true
 	return u
 }
+
+// PasswordExpiresAt vraca trenutak kad lozinka ističe: poslednja promena lozinke
+// (passwordChangedAt) plus maxAge. Ako passwordChangedAt nedostaje (stari dokument),
+// koristi se createdAt.
+func (u User) PasswordExpiresAt(maxAge time.Duration) time.Time {
+	changed := u.PasswordChangedAt
+	if changed.IsZero() {
+		changed = u.CreatedAt
+	}
+	return changed.Add(maxAge)
+}
+
+// PasswordExpired javlja da je lozinka starija od dozvoljenog (US-16). Tacno na
+// granici lozinka jos vazi; istekla je tek posle nje.
+func (u User) PasswordExpired(now time.Time, maxAge time.Duration) bool {
+	return now.After(u.PasswordExpiresAt(maxAge))
+}

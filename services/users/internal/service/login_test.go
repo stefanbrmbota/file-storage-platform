@@ -65,7 +65,7 @@ func newLoginEnv(t *testing.T, active bool) *loginEnv {
 	otp := &fakeOTPIssuer{code: "042517"}
 	mailer := &fakeMailer{}
 	tokens := &fakeTokenIssuer{}
-	svc, err := NewLoginService(repo, otp, tokens, mailer, 5*time.Minute, testParams)
+	svc, err := NewLoginService(repo, otp, tokens, mailer, 5*time.Minute, testParams, testMaxAge)
 	if err != nil {
 		t.Fatal(err)
 	}
