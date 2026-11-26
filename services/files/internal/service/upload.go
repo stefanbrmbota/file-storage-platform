@@ -67,7 +67,7 @@ type UploadInput struct {
 
 // Upload stores a new file in one of the user's folders (US-02):
 //
-//  1. check the name and that the folder is the user's own
+//  1. check the name and that the user may write to the folder (US-65)
 //  2. reserve quota in the Users service (sync call, design 5.4 S3)
 //  3. stream the content to MinIO and compute its SHA-256 on the way
 //  4. save the metadata in MongoDB
@@ -83,7 +83,7 @@ func (s *FileService) Upload(ctx context.Context, in UploadInput) (*model.File, 
 		return nil, ErrInvalidSize
 	}
 
-	folder, err := s.folders.ownFolder(ctx, in.OwnerID, in.FolderID)
+	folder, err := s.folders.uploadTarget(ctx, in.OwnerID, in.FolderID)
 	if err != nil {
 		return nil, err
 	}
