@@ -141,3 +141,22 @@ func TestInvalidTimeout(t *testing.T) {
 		t.Fatal("ocekivana greska")
 	}
 }
+
+func TestRateLimits(t *testing.T) {
+	t.Setenv("GATEWAY_RATE_LIMIT_PUBLIC_PER_MIN", "")
+	t.Setenv("GATEWAY_RATE_LIMIT_USER_PER_MIN", "")
+	cfg, err := Load()
+	if err != nil || cfg.RateLimitPublicPerMin != 20 || cfg.RateLimitUserPerMin != 300 {
+		t.Fatalf("podrazumevano: %v public=%d user=%d", err, cfg.RateLimitPublicPerMin, cfg.RateLimitUserPerMin)
+	}
+	t.Setenv("GATEWAY_RATE_LIMIT_PUBLIC_PER_MIN", "5")
+	t.Setenv("GATEWAY_RATE_LIMIT_USER_PER_MIN", "50")
+	cfg, err = Load()
+	if err != nil || cfg.RateLimitPublicPerMin != 5 || cfg.RateLimitUserPerMin != 50 {
+		t.Fatalf("iz env: %v public=%d user=%d", err, cfg.RateLimitPublicPerMin, cfg.RateLimitUserPerMin)
+	}
+	t.Setenv("GATEWAY_RATE_LIMIT_USER_PER_MIN", "0")
+	if _, err := Load(); err == nil || !strings.Contains(err.Error(), "GATEWAY_RATE_LIMIT") {
+		t.Fatalf("ocekivana greska za 0, dobijeno %v", err)
+	}
+}

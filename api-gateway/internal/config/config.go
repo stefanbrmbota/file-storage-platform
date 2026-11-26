@@ -43,6 +43,11 @@ type Config struct {
 	JWTSecret string
 	// AuthTimeout je najduze cekanje na Users servis pri proveri opozvanog tokena.
 	AuthTimeout time.Duration
+
+	// Ogranicenje broja zahteva u minuti (US-63): po IP adresi za javne rute
+	// (prijava, registracija, OTP) i po korisniku za zasticene rute.
+	RateLimitPublicPerMin int
+	RateLimitUserPerMin   int
 }
 
 // MinJWTSecretLen je najmanja duzina tajne (HS256 trazi bar 256 bita), ista kao u Users servisu.
@@ -59,9 +64,15 @@ func Load() (Config, error) {
 		IdleTimeout:       env.Duration("GATEWAY_IDLE_TIMEOUT", 60*time.Second),
 		JWTSecret:         env.Required("JWT_SECRET"),
 		AuthTimeout:       env.Duration("GATEWAY_AUTH_TIMEOUT", 5*time.Second),
+
+		RateLimitPublicPerMin: env.Int("GATEWAY_RATE_LIMIT_PUBLIC_PER_MIN", 20),
+		RateLimitUserPerMin:   env.Int("GATEWAY_RATE_LIMIT_USER_PER_MIN", 300),
 	}
 
 	var errs []error
+	if cfg.RateLimitPublicPerMin < 1 || cfg.RateLimitUserPerMin < 1 {
+		errs = append(errs, errors.New("config: GATEWAY_RATE_LIMIT_* mora biti pozitivan broj"))
+	}
 	parse := func(key, fallback string) *url.URL {
 		u, err := parseServiceURL(key, env.String(key, fallback))
 		if err != nil {

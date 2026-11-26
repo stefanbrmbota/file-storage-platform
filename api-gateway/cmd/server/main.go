@@ -14,6 +14,7 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/config"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/ratelimit"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/routes"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/secheaders"
 )
@@ -37,16 +38,23 @@ func main() {
 	// /internal/..., vraca 404 (design 5.3, tacka 4). Rute koje nisu javne
 	// traze ispravan, neopozvan JWT (T-30.5).
 	authenticator := auth.New(cfg.JWTSecret, cfg.UsersURL, cfg.AuthTimeout, logger)
+	// Ogranicenje broja zahteva (US-63): javne rute po IP adresi, zasticene po korisniku.
+	publicLimit := ratelimit.New(cfg.RateLimitPublicPerMin)
+	userLimit := ratelimit.New(cfg.RateLimitUserPerMin)
+	limits := routes.Limits{
+		Public: func(h http.Handler) http.Handler { return publicLimit.Middleware(ratelimit.ByIP, h) },
+		User:   func(h http.Handler) http.Handler { return userLimit.Middleware(ratelimit.ByUser, h) },
+	}
 	routes.Register(mux, map[routes.Service]http.Handler{
 		routes.Users:         proxy.New(cfg.UsersURL, cfg.UpstreamTimeout, logger),
 		routes.Files:         proxy.New(cfg.FilesURL, cfg.UpstreamTimeout, logger),
 		routes.Sharing:       proxy.New(cfg.SharingURL, cfg.UpstreamTimeout, logger),
 		routes.Notifications: proxy.New(cfg.NotificationsURL, cfg.UpstreamTimeout, logger),
 		routes.Analytics:     proxy.New(cfg.AnalyticsURL, cfg.UpstreamTimeout, logger),
-	}, authenticator)
+	}, authenticator, limits)
 	// Provera da li je sesija klijenta i dalje vazeca (T-32.4): odgovara sam
 	// gateway, posle provere tokena i opoziva.
-	mux.Handle("GET /api/auth/session", authenticator.Require(auth.SessionHandler()))
+	mux.Handle("GET /api/auth/session", authenticator.Require(limits.User(auth.SessionHandler())))
 
 	// Bezbednosna zaglavlja na svakom odgovoru, i na greskama (US-62, T-62.1).
 	srv := newServer(cfg, secheaders.Middleware(cors.Middleware(cfg.CORSAllowedOrigins, mux)))
@@ -60,7 +68,9 @@ func main() {
 			"users", cfg.UsersURL.Host, "files", cfg.FilesURL.Host,
 			"notifications", cfg.NotificationsURL.Host, "sharing", cfg.SharingURL.Host,
 			"analytics", cfg.AnalyticsURL.Host,
-			"cors_origins", cfg.CORSAllowedOrigins)
+			"cors_origins", cfg.CORSAllowedOrigins,
+			"rate_limit_public_per_min", cfg.RateLimitPublicPerMin,
+			"rate_limit_user_per_min", cfg.RateLimitUserPerMin)
 		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)
