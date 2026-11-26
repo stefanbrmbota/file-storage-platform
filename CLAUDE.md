@@ -63,7 +63,14 @@ docker build -f api-gateway/Dockerfile -t fsp-gateway .
 ```
 
 ## Docker Compose (lokalno okruženje, US-33 / T-33.2, vlasnik AP)
-`docker-compose.yml` u root-u podiže klijenta (Angular), gateway, svih 5 servisa, MongoDB, Cassandru, Neo4j, MinIO i MailHog:
+`docker-compose.yml` u root-u podiže klijenta (Angular), gateway, svih 5 servisa, MongoDB, Cassandru, Neo4j, MinIO i MailHog.
+
+HTTPS (US-67): klijent je na `https://localhost:3000`, gateway na `https://localhost:8080`. Pre prvog `docker compose up` napravi sertifikate u `certs/` (nisu u git-u) i jednom dodaj lokalni CA u poverene sertifikate (bez admin prava), pa restartuj pretraživač:
+```
+cd api-gateway
+go run ./cmd/devcert
+certutil -user -addstore Root ..\certs\ca.crt
+```
 ```
 docker compose up --build -d
 docker compose ps
