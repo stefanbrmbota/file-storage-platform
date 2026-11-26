@@ -1,6 +1,26 @@
-<h1>Dobrodošli</h1>
-<p>Platforma za skladištenje i deljenje fajlova.</p>
-@if (claims(); as c) {
-  <p class="role">Prijavljen si (uloga: {{ c.role === 'ADMIN' ? 'administrator' : 'korisnik' }}).</p>
-}
-<p class="status" [attr.data-status]="gatewayStatus()">Gateway: {{ gatewayStatus() }}</p>
+<section class="hero">
+  <p class="eyebrow">Kontrolna tabla</p>
+  <h1>Dobrodošli</h1>
+  <p class="lead">Platforma za skladištenje i deljenje fajlova.</p>
+  <div class="meta">
+    @if (claims(); as c) {
+      <span class="role">Prijavljen si (uloga: {{ c.role === 'ADMIN' ? 'administrator' : 'korisnik' }}).</span>
+    }
+    <span class="status" [attr.data-status]="gatewayStatus()">Gateway: {{ gatewayStatus() }}</span>
+  </div>
+</section>
+
+<nav class="tiles" aria-label="Prečice">
+  <a class="tile" routerLink="/folderi">
+    <span class="tile__title">Moji fajlovi</span>
+    <span class="tile__text">Folderi, otpremanje i nove verzije datoteka.</span>
+  </a>
+  <a class="tile" routerLink="/profil">
+    <span class="tile__title">Profil</span>
+    <span class="tile__text">Podaci o nalogu, lozinka i zauzeće kvote.</span>
+  </a>
+  <a class="tile" routerLink="/obavestenja">
+    <span class="tile__title">Obaveštenja</span>
+    <span class="tile__text">Događaji vezani za tvoj nalog i fajlove.</span>
+  </a>
+</nav>

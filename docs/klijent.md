@@ -157,11 +157,38 @@ protected readonly claims = inject(TokenService).claims; // { userId, role, expi
 
 To je samo za prikaz; pravo pristupa uvek proverava gateway i servis.
 
-### 3.6 Stil
+### 3.6 Stil (izgled je zajednički, ne menja se)
 
-Koristi zajedničke boje iz `src/styles.css` (`var(--accent)`,
-`var(--danger)`, `var(--border)`, `var(--muted)`...), da sve stranice
-izgledaju isto. Stil samo za tvoju stranicu ide u njen `.css`.
+Klijent ima jednu tamnu temu. Ceo vizuelni sistem (boje, polja, dugmad,
+tabele, zaobljenja) je u `src/styles.css`. **Nova stranica prati postojeći
+izgled; tema, paleta i `styles.css` se ne menjaju bez dogovora tima.**
+
+Pravila:
+
+- **Boje samo kroz promenljive**, nikad zakucane (`#fff`, `#ffebe9`, `white`...):
+  - površine: `--background`, `--surface` (kartica), `--surface-2` (zaglavlje tabele, hover), `--field`;
+  - ivice: `--border`, `--border-strong`;
+  - tekst: `--text`, `--text-2`, `--muted`;
+  - akcenat: `--accent`, `--accent-hover`, `--accent-soft`, a `--on-accent` je tekst na akcentu;
+  - stanja: `--success`, `--warning`, `--danger` i njihove `-soft` pozadine;
+  - oblik: `--radius`, `--radius-sm`, `--shadow`.
+- **Ne prepisuj osnovne elemente** u `.css` stranice. `input`, `select`,
+  `button`, `table` i `form label` već imaju stil iz `styles.css`. Obično
+  `<button>` je primarna akcija (tirkizno). Ako treba sporedno dugme,
+  dodaj klasu sa providnom pozadinom i `--border-strong` ivicom (kao
+  `.logout`, `.more`, `button.secondary` u Folderima).
+- **Obrasci koje treba kopirati, umesto da se izmišlja nov izgled:**
+  - forma (prijava, lozinke): kartica na sredini, kao `pages/login/login.css`;
+  - podaci u tabeli: tabela u kartici, kao `pages/folderi` (`.panel`) ili `pages/admin` (`.admin__scroll`);
+  - poruka o grešci ili uspehu: ivica i `-soft` pozadina, kao `.login__error` i `.pl__ok`;
+  - prazno stanje: kao `.empty` u Folderima ili Obaveštenjima.
+- Zajedničke klase: `.card`, `.muted`, `.sr-only`.
+- **Bez emoji ikonica.** Ikonice su mali inline SVG sa `stroke` u boji
+  teme (vidi `pages/folderi/folderi.html`).
+- Naslov stranice je jedan `<h1>`, a delovi stranice su `<h2>`. Sadržaj je
+  već centriran i ograničen na 1080 px u `layout/shell.css`.
+
+Stil samo za tvoju stranicu (raspored, razmaci) ide u njen `.css`.
 
 ### 3.7 Test
 

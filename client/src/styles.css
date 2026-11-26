@@ -1,27 +1,250 @@
-/* Zajednicke boje i osnovni stil (T-32.2). Stranice koriste ove promenljive. */
+/*
+ * Vizuelni sistem klijenta: tamna tema „Vault“.
+ *
+ * SVE boje, razmaci i zaobljenja su ovde, kao promenljive. Stranice ne
+ * zakucavaju boje (#fff, #ffebe9...), nego koriste promenljive i zajednička
+ * pravila ispod (dugmad, polja, tabele, poruke). Uputstvo: docs/klijent.md,
+ * odeljak „Izgled“.
+ */
 :root {
-  --text: #1f2328;
-  --muted: #59636e;
-  --border: #d1d9e0;
-  --surface: #f6f8fa;
-  --background: #ffffff;
-  --accent: #0969da;
-  --success: #1a7f37;
-  --danger: #cf222e;
+  color-scheme: dark;
+
+  /* Površine, od najdublje ka najvišoj. */
+  --background: #0b0e13;
+  --surface: #12161d;
+  --surface-2: #181d26;
+  --field: #0e1218;
+
+  /* Ivice. */
+  --border: #232a35;
+  --border-strong: #313a48;
+
+  /* Tekst. */
+  --text: #e6e9ef;
+  --text-2: #b4bccb;
+  --muted: #7f8a9c;
+
+  /* Akcenat (tirkizna): primarne akcije, linkovi, aktivno stanje. */
+  --accent: #3cc8b4;
+  --accent-hover: #5ad7c4;
+  --accent-soft: rgba(60, 200, 180, 0.12);
+  --accent-ring: rgba(60, 200, 180, 0.28);
+  --on-accent: #04221d;
+
+  /* Stanja. */
+  --success: #4fcf8a;
+  --success-soft: rgba(79, 207, 138, 0.12);
+  --warning: #e6b450;
+  --warning-soft: rgba(230, 180, 80, 0.12);
+  --danger: #f07178;
+  --danger-soft: rgba(240, 113, 120, 0.12);
+
+  /* Oblik. */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset, 0 12px 32px rgba(0, 0, 0, 0.35);
+  --font: 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Roboto, sans-serif;
+  --mono: 'Cascadia Code', 'JetBrains Mono', Consolas, ui-monospace, monospace;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html {
+  background: var(--background);
+}
+
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+  min-height: 100vh;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.55;
   color: var(--text);
-  background: var(--background);
-  line-height: 1.5;
+  background:
+    radial-gradient(1200px 500px at 85% -10%, rgba(60, 200, 180, 0.07), transparent 60%),
+    var(--background);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--accent-ring);
+}
+
+/* ---- Tipografija ---------------------------------------------------- */
+
+h1 {
+  margin: 0 0 1rem;
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+h2 {
+  margin: 2rem 0 0.75rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+p {
+  margin: 0 0 0.75rem;
 }
 
 a {
   color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+small {
+  font-size: 0.83rem;
+}
+
+strong {
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Forme ----------------------------------------------------------- */
+
+form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--text-2);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+input,
+select,
+textarea {
+  padding: 9px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+  color: var(--text);
+  font: inherit;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+
+input::placeholder {
+  color: #566072;
+}
+
+input:hover,
+select:hover {
+  border-color: #3d4757;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-ring);
+}
+
+/* ---- Dugmad ---------------------------------------------------------- */
+
+/* Podrazumevano dugme je primarna akcija. */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font: inherit;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ---- Tabele ---------------------------------------------------------- */
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  background: var(--surface-2);
+}
+
+tbody tr {
+  transition: background 0.12s;
+}
+
+tbody tr:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---- Zajedničke klase -------------------------------------------------- */
+
+/* Kartica: uokviren blok sadržaja (forma prijave, tabela, panel). */
+.card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Samo za čitače ekrana. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }

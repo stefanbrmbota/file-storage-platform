@@ -1,53 +1,61 @@
+/* Putanja (breadcrumb) od korena do trenutnog foldera. */
 .path {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.4rem;
   align-items: center;
-  margin-bottom: 1rem;
+  gap: 6px;
+  margin: -0.4rem 0 1.5rem;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.path a {
+  color: var(--text-2);
+}
+
+.path a:hover {
+  color: var(--accent);
 }
 
 .path__sep {
-  color: var(--muted);
+  color: var(--border-strong);
 }
 
 .path__current {
+  color: var(--text);
   font-weight: 600;
 }
 
 .toolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 1rem;
   align-items: center;
-  margin-bottom: 1rem;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
 .new-folder {
   display: flex;
-  gap: 0.5rem;
+  gap: 8px;
 }
 
-input[type='text'] {
-  padding: 0.4rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit;
+.new-folder input {
+  width: 260px;
 }
 
-button,
-.upload {
-  padding: 0.4rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
-  font: inherit;
-  cursor: pointer;
+/* Sporedno dugme: „Novi folder“, „Otkaži“. */
+.new-folder button,
+button.secondary {
+  border-color: var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
-button:disabled,
-.upload--disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.new-folder button:hover:not(:disabled),
+button.secondary:hover:not(:disabled) {
+  border-color: var(--muted);
+  background: #202733;
 }
 
 /* Fajl se bira klikom na label; samo polje je skriveno. */
@@ -57,70 +65,149 @@ button:disabled,
 }
 
 .upload {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
   background: var(--accent);
-  border-color: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s;
 }
 
+.upload::before {
+  content: '+';
+  margin-right: 8px;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.upload:hover {
+  background: var(--accent-hover);
+}
+
+.upload--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Akcija u redu tabele, izgleda kao link. */
 button.link,
 .link {
   padding: 0;
   border: none;
   background: none;
-  color: var(--accent);
-  cursor: pointer;
-  font: inherit;
-}
-
-.items {
-  width: 100%;
-  border-collapse: collapse;
-}
-
-.items th,
-.items td {
-  text-align: left;
-  padding: 0.5rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.items th {
   color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+button.link:hover:not(:disabled),
+.link:hover {
+  background: none;
+  color: var(--accent);
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.items td {
+  vertical-align: middle;
+}
+
+.items td:nth-child(3) {
+  font-variant-numeric: tabular-nums;
+}
+
+.name,
+button.link.name {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--text);
+  font-size: 0.95rem;
   font-weight: 500;
 }
 
-.name {
-  font-weight: 500;
+button.link.name:hover:not(:disabled) {
+  color: var(--accent);
+}
+
+.icon {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.icon--folder {
+  fill: var(--accent-soft);
+  stroke: var(--accent);
+}
+
+.icon--file {
+  stroke: var(--muted);
 }
 
 .actions {
   display: flex;
-  gap: 1rem;
   justify-content: flex-end;
+  gap: 18px;
+  white-space: nowrap;
 }
 
 .rename {
   display: flex;
-  gap: 0.5rem;
   align-items: center;
+  gap: 8px;
 }
 
-.muted {
-  color: var(--muted);
+.rename input {
+  padding: 6px 10px;
+}
+
+.rename button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 .empty {
-  padding: 1rem 0;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.empty__title {
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.empty p:last-child {
+  margin: 0;
 }
 
 .error {
+  padding: 10px 14px;
+  border: 1px solid rgba(240, 113, 120, 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
   color: var(--danger);
 }
 
-.sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
+@media (max-width: 720px) {
+  .new-folder,
+  .new-folder input {
+    width: 100%;
+  }
+
+  .panel {
+    overflow-x: auto;
+  }
 }

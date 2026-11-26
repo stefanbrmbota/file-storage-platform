@@ -1,11 +1,114 @@
+.hero {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin-bottom: 0.4rem;
+  font-size: 2rem;
+}
+
+.lead {
+  color: var(--text-2);
+  font-size: 1.05rem;
+}
+
+.meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* Stanje gateway-a kao „pilula“ sa tačkom u boji. */
 .status {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
   color: var(--muted);
 }
 
+.status::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
 .status[data-status='dostupan'] {
+  border-color: rgba(79, 207, 138, 0.35);
   color: var(--success);
 }
 
+.status[data-status='dostupan']::before {
+  background: var(--success);
+  box-shadow: 0 0 0 3px var(--success-soft);
+}
+
 .status[data-status='nedostupan'] {
+  border-color: rgba(240, 113, 120, 0.35);
   color: var(--danger);
+}
+
+.status[data-status='nedostupan']::before {
+  background: var(--danger);
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 22px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    background 0.15s;
+}
+
+.tile:hover {
+  border-color: rgba(60, 200, 180, 0.45);
+  background: var(--surface-2);
+  color: var(--text);
+  text-decoration: none;
+  transform: translateY(-2px);
+}
+
+.tile__title {
+  font-weight: 600;
+}
+
+.tile__title::after {
+  content: ' →';
+  color: var(--accent);
+}
+
+.tile__text {
+  color: var(--muted);
+  font-size: 0.9rem;
 }

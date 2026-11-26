@@ -1,6 +1,11 @@
 .profil {
-  max-width: 560px;
-  margin: 32px auto;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.profil h2 {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
 }
 
 .profil__info {
@@ -8,22 +13,27 @@
 }
 
 .profil__error {
-  padding: 8px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  padding: 10px 14px;
+  border: 1px solid rgba(240, 113, 120, 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
   color: var(--danger);
-  background: #ffebe9;
 }
 
 .profil__data {
   display: grid;
   grid-template-columns: max-content 1fr;
-  gap: 4px 16px;
-  margin: 0 0 24px;
+  gap: 10px 24px;
+  margin: 0 0 1rem;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 .profil__data dt {
   color: var(--muted);
+  font-size: 0.875rem;
 }
 
 .profil__data dd {
@@ -32,16 +42,17 @@
 }
 
 .profil__bar {
-  height: 14px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--surface);
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-2);
   overflow: hidden;
 }
 
 .profil__fill {
   height: 100%;
+  border-radius: 4px;
   background: var(--accent);
+  transition: width 0.3s;
 }
 
 .profil__fill--high {
@@ -49,51 +60,44 @@
 }
 
 .profil__summary {
-  margin: 8px 0 16px;
+  margin: 10px 0 16px;
+  color: var(--text-2);
 }
 
 .profil__quota {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   margin: 0;
 }
 
 .profil__quota > div {
-  flex: 1 1 140px;
-  padding: 10px 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
 .profil__quota dt {
   color: var(--muted);
-  font-size: 0.875rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .profil__quota dd {
-  margin: 2px 0 0;
-  font-size: 1.125rem;
+  margin: 4px 0 0;
+  font-size: 1.25rem;
   font-weight: 600;
-}
-
-button {
-  padding: 9px 12px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
+  font-variant-numeric: tabular-nums;
 }
 
 .profil__password {
   margin: 0 0 12px;
-  padding: 10px 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
@@ -103,21 +107,22 @@ button {
 
 .profil__password-text {
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .profil__password--warn {
-  border-color: #bf8700;
-  background: #fff8c5;
+  border-color: rgba(230, 180, 80, 0.4);
+  background: var(--warning-soft);
 }
 
 .profil__password--warn .profil__password-text {
-  color: #7d4e00;
+  color: var(--warning);
   font-weight: 600;
 }
 
 .profil__password--expired {
-  border-color: var(--danger);
-  background: #ffebe9;
+  border-color: rgba(240, 113, 120, 0.4);
+  background: var(--danger-soft);
 }
 
 .profil__password--expired .profil__password-text {

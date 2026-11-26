@@ -1,54 +1,32 @@
+/* Kartica forme na sredini ekrana; dugmad, polja i boje dolaze iz styles.css. */
 .pl {
-  max-width: 360px;
-  margin: 32px auto;
+  max-width: 420px;
+  margin: 24px auto;
+  padding: 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.pl h1 {
+  margin-bottom: 1.25rem;
+  font-size: 1.4rem;
 }
 
 form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
-label {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-weight: 500;
-}
-
-input {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit;
-}
-
-input:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-button[type='submit'],
-.pl__button {
-  display: inline-block;
-  padding: 9px 12px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
+form button[type='submit'] {
+  width: 100%;
+  margin-top: 6px;
 }
 
 .pl__hint {
-  margin-top: -6px;
+  margin-top: -8px;
   color: var(--danger);
 }
 
@@ -57,20 +35,70 @@ button:disabled {
   padding-left: 18px;
 }
 
+.pl__error,
+.pl__ok {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 0.9rem;
+}
+
 .pl__error {
-  padding: 8px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  border: 1px solid rgba(240, 113, 120, 0.35);
+  background: var(--danger-soft);
   color: var(--danger);
-  background: #ffebe9;
 }
 
 .pl__ok {
-  padding: 8px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  border: 1px solid rgba(79, 207, 138, 0.35);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
+.pl__info,
 .pl__alt {
   color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.pl__info {
+  margin: 0 0 0.9rem;
+}
+
+.pl__info + .pl__info {
+  margin-top: -0.4rem;
+}
+
+form + .pl__info,
+form + .pl__alt {
+  margin-top: 1.25rem;
+}
+
+/* Link koji izgleda kao primarno dugme (npr. „Idi na prijavu“). */
+.pl__button {
+  display: inline-flex;
+  padding: 9px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.pl__button:hover {
+  background: var(--accent-hover);
+  color: var(--on-accent);
+  text-decoration: none;
+}
+
+/* Sporedna akcija u formi (npr. „Nazad“). */
+.pl__link {
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-weight: 500;
+}
+
+.pl__link:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
 }

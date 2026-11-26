@@ -47,8 +47,12 @@
   }
 
   @if (c.folders.length === 0 && c.files.length === 0) {
-    <p class="muted empty">Folder je prazan.</p>
+    <div class="panel empty">
+      <p class="empty__title">Folder je prazan.</p>
+      <p class="muted">Napravi folder ili otpremi prvi fajl.</p>
+    </div>
   } @else {
+    <div class="panel">
     <table class="items">
       <thead>
         <tr>
@@ -73,10 +77,13 @@
                     (input)="renameValue.set($any($event.target).value)"
                   />
                   <button type="submit" [disabled]="busy()">Sačuvaj</button>
-                  <button type="button" class="link" (click)="cancelRename()">Otkaži</button>
+                  <button type="button" class="secondary" (click)="cancelRename()">Otkaži</button>
                 </form>
               } @else {
-                <button type="button" class="link name" (click)="openFolder(f)">📁 {{ f.name }}</button>
+                <button type="button" class="link name" (click)="openFolder(f)">
+                  <svg class="icon icon--folder" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2.2h7.4A2.5 2.5 0 0 1 21 9.7v7.8a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5z" /></svg>
+                  <span>{{ f.name }}</span>
+                </button>
               }
             </td>
             <td class="muted">folder</td>
@@ -104,10 +111,13 @@
                     (input)="renameValue.set($any($event.target).value)"
                   />
                   <button type="submit" [disabled]="busy()">Sačuvaj</button>
-                  <button type="button" class="link" (click)="cancelRename()">Otkaži</button>
+                  <button type="button" class="secondary" (click)="cancelRename()">Otkaži</button>
                 </form>
               } @else {
-                <span class="name">📄 {{ file.name }}</span>
+                <span class="name">
+                  <svg class="icon icon--file" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3h7l5 5v11.5A1.5 1.5 0 0 1 17.5 21h-10A1.5 1.5 0 0 1 6 19.5v-15A1.5 1.5 0 0 1 7.5 3z" /><path d="M14 3v5h5" /></svg>
+                  <span>{{ file.name }}</span>
+                </span>
               }
             </td>
             <td class="muted">{{ file.contentType }}</td>
@@ -128,5 +138,6 @@
         }
       </tbody>
     </table>
+    </div>
   }
 }

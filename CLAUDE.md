@@ -99,3 +99,9 @@ npx ng test --watch=false
 npx ng build
 ```
 Nova stranica: `pages/<stranica>/` (`npx ng generate component pages/<stranica>`), ruta u `app.routes.ts` ispred `'**'` (zaštićena sa `canActivate: [authGuard]`), stavka menija u `layout/shell.ts`. Gateway se zove preko `HttpClient` i `config.gatewayUrl`; token i 401 rešava interceptor, a greške `apiErrorMessage`. `core/` i `layout/` ne menjati bez dogovora sa AP. Detaljno: `docs/klijent.md`.
+
+**Izgled klijenta je zaključan (tamna tema, `src/styles.css`).** Ne menjaj temu, paletu, `styles.css` ni `layout/shell.css`, osim ako to tim izričito ne traži. Svaka nova stranica ili izmena prati postojeći izgled, po pravilima iz `docs/klijent.md` (odeljak 3.6):
+- boje samo kroz CSS promenljive (`var(--surface)`, `var(--accent)`, `var(--danger-soft)`...), nikad zakucane;
+- ne prepisuj osnovni stil za `input`, `button`, `table` i `form label` u `.css` stranice;
+- kopiraj postojeće obrasce: forma kao kartica (`pages/login`), tabela u kartici (`pages/folderi`, `pages/admin`), poruke `__error`/`__ok`, prazno stanje `.empty`;
+- bez emoji ikonica (koristi inline SVG kao u `pages/folderi`).

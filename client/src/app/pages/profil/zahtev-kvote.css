@@ -1,27 +1,29 @@
 .zk__info {
   color: var(--muted);
+  font-size: 0.9rem;
 }
 
 .zk__status {
   margin: 0 0 12px;
-  padding: 10px 12px;
+  padding: 14px 16px;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 
 .zk__status--pending {
-  border-color: #bf8700;
-  background: #fff8c5;
+  border-color: rgba(230, 180, 80, 0.4);
+  background: var(--warning-soft);
 }
 
 .zk__status--approved {
-  border-color: var(--accent);
+  border-color: rgba(79, 207, 138, 0.4);
+  background: var(--success-soft);
 }
 
 .zk__status--rejected {
-  border-color: var(--danger);
-  background: #ffebe9;
+  border-color: rgba(240, 113, 120, 0.4);
+  background: var(--danger-soft);
 }
 
 .zk__date {
@@ -31,10 +33,12 @@
 form {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 label {
+  color: var(--text-2);
+  font-size: 0.875rem;
   font-weight: 500;
 }
 
@@ -44,39 +48,9 @@ label {
   gap: 8px;
 }
 
-input,
-select {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  font: inherit;
-}
-
 input {
   flex: 1 1 120px;
   min-width: 0;
-}
-
-input:focus,
-select:focus {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-button {
-  padding: 9px 12px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
 }
 
 .zk__hint {
@@ -84,9 +58,9 @@ button:disabled {
 }
 
 .zk__error {
-  padding: 8px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  padding: 10px 14px;
+  border: 1px solid rgba(240, 113, 120, 0.35);
+  border-radius: var(--radius-sm);
+  background: var(--danger-soft);
   color: var(--danger);
-  background: #ffebe9;
 }

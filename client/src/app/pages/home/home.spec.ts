@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
+import { provideRouter } from '@angular/router';
 import { Home } from './home';
 import { ConfigService } from '../../core/config.service';
 
@@ -10,7 +11,7 @@ describe('Home', () => {
   beforeEach(() => {
     TestBed.configureTestingModule({
       imports: [Home],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     TestBed.inject(ConfigService).setForTest({ gatewayUrl: 'http://gw.test' });
     http = TestBed.inject(HttpTestingController);

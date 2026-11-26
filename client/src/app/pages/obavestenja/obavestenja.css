@@ -1,21 +1,20 @@
-.muted {
-  color: var(--muted);
-}
-
 .error {
   color: var(--danger);
 }
 
 .list {
-  list-style: none;
   margin: 0;
   padding: 0;
+  list-style: none;
   border: 1px solid var(--border);
-  border-radius: 6px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
 }
 
 .item {
-  padding: 12px 16px;
+  position: relative;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -23,8 +22,20 @@
   border-bottom: none;
 }
 
+/* Nepročitano: tanka linija akcenta sa leve strane. */
 .item--unread {
-  background: var(--surface);
+  background: var(--surface-2);
+}
+
+.item--unread::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: 0;
+  width: 3px;
+  border-radius: 0 2px 2px 0;
+  background: var(--accent);
 }
 
 .item--unread .item__message {
@@ -35,42 +46,51 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 0.85rem;
   color: var(--muted);
+  font-size: 0.8rem;
 }
 
 .item__type {
-  font-weight: 500;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .item__new {
-  padding: 0 6px;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.75rem;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 600;
 }
 
 .item__time {
   margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .item__message {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
 }
 
 .more {
   margin-top: 16px;
-  padding: 8px 14px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--background);
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
+  border: 1px solid var(--border-strong);
+  background: transparent;
+  color: var(--text-2);
+  font-weight: 500;
 }
 
-.more:disabled {
-  opacity: 0.6;
-  cursor: default;
+.more:hover:not(:disabled) {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+/* Prazno stanje u kartici. */
+.empty {
+  padding: 48px 24px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  text-align: center;
 }

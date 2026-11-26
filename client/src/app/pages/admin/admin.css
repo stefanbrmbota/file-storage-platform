@@ -1,93 +1,87 @@
 .admin {
-  max-width: 960px;
-  margin: 32px auto;
+  max-width: 1080px;
+  margin: 0 auto;
 }
 
 .admin__info {
   color: var(--muted);
 }
 
+.admin__error,
+.admin__ok {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+}
+
 .admin__error {
-  padding: 8px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
+  border: 1px solid rgba(240, 113, 120, 0.35);
+  background: var(--danger-soft);
   color: var(--danger);
-  background: #ffebe9;
 }
 
 .admin__ok {
-  padding: 8px 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  border: 1px solid rgba(79, 207, 138, 0.35);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
+/* Tabela u kartici; na uskom ekranu se pomera vodoravno. */
 .admin__scroll {
   overflow-x: auto;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
 }
 
 th,
 td {
-  padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
   white-space: nowrap;
 }
 
-th {
-  color: var(--muted);
-  font-size: 0.875rem;
-  font-weight: 600;
+td {
+  font-variant-numeric: tabular-nums;
 }
 
 .admin__status {
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 0.875rem;
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  color: var(--text-2);
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .admin__status--pending {
-  border-color: #bf8700;
-  background: #fff8c5;
+  border-color: rgba(230, 180, 80, 0.4);
+  background: var(--warning-soft);
+  color: var(--warning);
 }
 
 .admin__status--approved {
-  border-color: var(--accent);
+  border-color: rgba(79, 207, 138, 0.4);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .admin__status--rejected {
-  border-color: var(--danger);
-  background: #ffebe9;
+  border-color: rgba(240, 113, 120, 0.4);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .admin__tag {
   margin-left: 6px;
-  padding: 1px 6px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
   color: var(--muted);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
 }
 
-button {
-  padding: 9px 12px;
-  border: none;
-  border-radius: 6px;
-  background: var(--accent);
-  color: #fff;
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-button:disabled {
-  opacity: 0.6;
-  cursor: default;
+td button {
+  padding: 6px 12px;
+  font-size: 0.85rem;
 }
 
 td button + button {
@@ -95,5 +89,11 @@ td button + button {
 }
 
 .admin__reject {
-  background: var(--danger);
+  border-color: rgba(240, 113, 120, 0.45);
+  background: transparent;
+  color: var(--danger);
+}
+
+.admin__reject:hover:not(:disabled) {
+  background: var(--danger-soft);
 }
