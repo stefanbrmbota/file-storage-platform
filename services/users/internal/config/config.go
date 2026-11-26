@@ -42,6 +42,8 @@ type Config struct {
 	JWTSecret string        // tajna za potpis JWT-a; nikad se ne loguje
 	JWTTTL    time.Duration // rok vazenja JWT-a
 
+	PasswordMinAge time.Duration // najkrace vreme od poslednje promene lozinke do sledece (US-14)
+
 	InternalToken string // deljena tajna za interne pozive (X-Internal-Token); nikad se ne loguje
 }
 
@@ -100,6 +102,9 @@ func Load() (Config, error) {
 		cfg.OTPMaxAttempts = n
 	}
 	if cfg.JWTTTL, err = getDuration("JWT_TTL", 15*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.PasswordMinAge, err = getDuration("PASSWORD_MIN_AGE", 24*time.Hour); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
