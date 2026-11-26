@@ -179,6 +179,28 @@ Indeksi:
 | `uniq_tokenHash` | `{ tokenHash: 1 }` | `unique` | Potrošnja tokena po hešu jednim `FindOneAndDelete`, pa je token atomično jednokratan |
 | `ttl_expiresAt` | `{ expiresAt: 1 }` | `expireAfterSeconds: 0` | MongoDB sam briše istekle tokene |
 
+#### Kolekcija `quota_requests`
+
+Model: `services/users/internal/model/quota_request.go`. Zahtev korisnika za
+veću kvotu skladišta (US-21); odluku donosi administrator (US-23).
+
+| Polje (BSON) | Go tip | BSON tip | Obavezno | Ka klijentu | Opis |
+|---|---|---|---|---|---|
+| `_id` | `string` | string | da | da | ID zahteva (slučajan, heks). |
+| `userId` | `string` | string | da | da | `users._id` podnosioca. |
+| `requestedBytes` | `int64` | long | da | da | Tražena kvota u bajtovima; veća od kvote u trenutku podnošenja, najviše 1 PiB. |
+| `status` | `string` | string | da | da | `PENDING` (na čekanju), `APPROVED` ili `REJECTED`. |
+| `createdAt` | `time.Time` | date (UTC) | da | da | Kada je zahtev podnet. |
+| `decidedAt` | `*time.Time` | date (UTC) | ne | da | Kada je administrator odlučio (US-23); nema ga dok je zahtev na čekanju. |
+
+Indeksi:
+
+| Ime | Ključ | Opcije | Svrha |
+|---|---|---|---|
+| `_id_` | `_id` | podrazumevani | Pronalaženje zahteva po ID-ju (odluka, US-23) |
+| `uniq_pending_per_user` | `{ userId: 1 }` | `unique`, `partialFilterExpression: { status: "PENDING" }` | Korisnik ima najviše jedan zahtev na čekanju, i kad se dva podnesu istovremeno; odlučeni zahtevi ostaju kao istorija |
+| `user_createdAt` | `{ userId: 1, createdAt: -1 }` | — | Najnoviji zahtev korisnika |
+
 > **Napomena o TTL-u:** MongoDB briše istekle dokumente u pozadini otprilike
 > jednom u minuti, pa istekao token ili OTP može kratko ostati u bazi. Servis
 > zato uvek sam proverava `expiresAt`; TTL indeks služi samo za čišćenje.
@@ -248,6 +270,7 @@ Indeksi:
 | `users` → `otps` | 1 : 0..1 | `otps._id` | Novi OTP prepisuje stari. |
 | `users` → `password_reset_tokens` | 1 : 0..1 | `password_reset_tokens._id` | Novi zahtev za reset prepisuje stari; token se troši i briše u istom koraku. |
 | `users` → `magic_link_tokens` | 1 : 0..1 | `magic_link_tokens._id` | Novi zahtev za magični link prepisuje stari; token se troši i briše u istom koraku. |
+| `users` → `quota_requests` | 1 : N (najviše jedan `PENDING`) | `quota_requests.userId` | Odlučeni zahtevi ostaju kao istorija; jedan na čekanju garantuje parcijalni jedinstveni indeks. |
 
 Pošto su `users` i `files`/`folders` u različitim bazama i servisima, **nema
 stranih ključeva ni transakcija preko granice servisa**. Konzistentnost se
@@ -783,7 +806,7 @@ duži od bilo kog realnog ponavljanja isporuke.
 
 | Servis | Baza | Keyspace / baza | Tabele / kolekcije |
 |---|---|---|---|
-| Users | MongoDB | `users` | `users`, `confirmation_tokens`, `otps`, `password_reset_tokens`, `magic_link_tokens`, `revoked_tokens` |
+| Users | MongoDB | `users` | `users`, `confirmation_tokens`, `otps`, `password_reset_tokens`, `magic_link_tokens`, `quota_requests`, `revoked_tokens` |
 | Files | MongoDB + MinIO | `files` | `folders`, `files` + bucket sa sadržajem |
 | Sharing | Neo4j | — | `:User`, `:Resource:Folder`, `:Resource:File`, `CONTAINS`, `HAS_ACCESS` |
 | Notifications | Cassandra | `notifications` | `notifications_by_user`, `unread_by_user`, `processed_events` |
@@ -871,6 +894,8 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `POST /api/auth/magic-link/login` | Users | ne | US-17 | Prijava tokenom iz linka: `{token}` (token u telu, ne u URL-u). `200` sa JWT-om `{token}`; `401` link je nevažeći, istekao ili već iskorišćen (jednokratan). Ne traži lozinku ni OTP, a istekla lozinka (US-16) ne blokira prijavu: link je način da se pristup povrati. Svaki pokušaj ide u log (`pokusaj prijave`, `step=magic-link`, IP, ishod). |
 | `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
 | `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0) i `passwordExpiresAt` (UTC; poslednja promena lozinke + `PASSWORD_MAX_AGE`, US-16: posle tog trenutka prijava nije moguća dok se lozinka ne promeni). Identitet samo iz `X-User-ID`; bez heša lozinke. |
+| `POST /api/users/me/quota-requests` | Users | da | US-21 | Zahtev za povećanje kvote: `{requestedBytes}` (veće od trenutne kvote, najviše 1 PiB). `201` sa zahtevom (`status: PENDING`); `400` neispravna vrednost ili nije veća od kvote; `409` korisnik već ima zahtev na čekanju. Identitet samo iz `X-User-ID`. |
+| `GET /api/users/me/quota-requests/latest` | Users | da | US-21 | Najnoviji zahtev prijavljenog korisnika sa statusom (`PENDING`, `APPROVED`, `REJECTED`). `404` ako još nije podneo nijedan. Korisnik vidi samo svoje zahteve. |
 | `POST /api/users/me/password` | Users | da | US-14 | Promena lozinke: `{currentPassword, newPassword, newPasswordConfirm}`. Nova lozinka mora biti jaka i različita od trenutne, a trenutna lozinka stara najmanje `PASSWORD_MIN_AGE` (podrazumevano 24h). Uspeh `204`, pa se token zahteva opoziva i korisnik se ponovo prijavljuje. Greške: `400` pravila lozinke, `403` pogrešna trenutna lozinka (namerno ne `401`), `409` prerano menjanje ili istovremena promena. |
 | `GET /api/auth/session` | gateway | da | US-32 | Odgovara sam gateway posle provere tokena i opoziva: `{userId, role}`. Klijent proverava da li sačuvan token još važi (npr. posle odjave u drugom tabu). |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
