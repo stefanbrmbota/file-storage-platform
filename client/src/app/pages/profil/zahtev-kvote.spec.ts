@@ -184,6 +184,7 @@ describe('Zahtev za povećanje kvote (profil)', () => {
     fill(f, '5');
     await submit(f);
     http.expectOne(SUBMIT).flush({ error: 'tražena kvota mora biti veća od trenutne' }, { status: 400, statusText: 'Bad Request' });
+    f.detectChanges();
 
     expect(el(f).querySelector('[role=alert]')?.textContent).toContain('veća od trenutne');
     expect(el(f).querySelector<HTMLInputElement>('input')!.value).toBe('5');
