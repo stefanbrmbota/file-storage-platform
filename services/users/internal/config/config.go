@@ -49,6 +49,10 @@ type Config struct {
 	PasswordResetTTL      time.Duration // rok vazenja linka za reset lozinke
 	PasswordResetCooldown time.Duration // najkrace vreme izmedju dva mejla za reset istom korisniku
 
+	MagicLinkURLBase  string        // klijentska stranica za prijavu magicnim linkom; token ide u #fragment (US-17)
+	MagicLinkTTL      time.Duration // rok vazenja magicnog linka
+	MagicLinkCooldown time.Duration // najkrace vreme izmedju dva magicna linka istom korisniku
+
 	InternalToken string // deljena tajna za interne pozive (X-Internal-Token); nikad se ne loguje
 }
 
@@ -70,6 +74,7 @@ func Load() (Config, error) {
 		SMTPPassword:      os.Getenv("SMTP_PASSWORD"),
 		ConfirmURLBase:    getEnv("CONFIRM_URL_BASE", "http://localhost:3000/potvrda"),
 		ResetURLBase:      getEnv("RESET_URL_BASE", "http://localhost:3000/reset-lozinke"),
+		MagicLinkURLBase:  getEnv("MAGIC_LINK_URL_BASE", "http://localhost:3000/magicni-link"),
 		FilesServiceURL:   getEnv("FILES_SERVICE_URL", "http://localhost:8082"),
 		OTPHMACSecret:     os.Getenv("OTP_HMAC_SECRET"),
 		JWTSecret:         os.Getenv("JWT_SECRET"),
@@ -124,6 +129,12 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	if cfg.PasswordResetCooldown, err = getDuration("PASSWORD_RESET_COOLDOWN", time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.MagicLinkTTL, err = getDuration("MAGIC_LINK_TTL", 10*time.Minute); err != nil {
+		return Config{}, err
+	}
+	if cfg.MagicLinkCooldown, err = getDuration("MAGIC_LINK_COOLDOWN", time.Minute); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
