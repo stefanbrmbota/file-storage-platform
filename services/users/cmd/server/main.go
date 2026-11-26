@@ -86,7 +86,7 @@ func main() {
 		Password: cfg.SMTPPassword,
 		Timeout:  cfg.RequestTimeout,
 	}
-	filesClient := svcclient.NewFilesClient(cfg.FilesServiceURL, cfg.RequestTimeout)
+	filesClient := svcclient.NewFilesClient(cfg.FilesServiceURL, cfg.InternalToken, cfg.RequestTimeout)
 	confirmation := service.NewConfirmationService(userRepo, tokenRepo, mailer, filesClient, cfg.ConfirmationTTL, cfg.ConfirmURLBase)
 	registration := service.NewRegistrationService(userRepo, confirmation, params, cfg.DefaultQuotaBytes)
 

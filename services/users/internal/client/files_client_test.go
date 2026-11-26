@@ -9,24 +9,28 @@ import (
 	"time"
 )
 
+// testToken je INTERNAL_TOKEN koji klijent salje Files servisu (US-62).
+const testToken = "test-internal-token-at-least-32-chars!"
+
 func TestCreateRootFolder_Success(t *testing.T) {
 	for _, status := range []int{http.StatusCreated, http.StatusOK} {
-		var gotPath, gotUser string
+		var gotPath, gotUser, gotToken string
 		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			gotPath = r.URL.Path
+			gotToken = r.Header.Get("X-Internal-Token")
 			var body map[string]string
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			gotUser = body["userId"]
 			w.WriteHeader(status)
 		}))
 
-		c := NewFilesClient(srv.URL+"/", time.Second)
+		c := NewFilesClient(srv.URL+"/", testToken, time.Second)
 		if err := c.CreateRootFolder(context.Background(), "u1"); err != nil {
 			t.Fatalf("status %d: %v", status, err)
 		}
 		srv.Close()
-		if gotPath != "/internal/folders/root" || gotUser != "u1" {
-			t.Errorf("status %d: path=%q userId=%q", status, gotPath, gotUser)
+		if gotPath != "/internal/folders/root" || gotUser != "u1" || gotToken != testToken {
+			t.Errorf("status %d: path=%q userId=%q token poslat=%v", status, gotPath, gotUser, gotToken == testToken)
 		}
 	}
 }
@@ -37,7 +41,7 @@ func TestCreateRootFolder_ErrorStatus(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewFilesClient(srv.URL, time.Second)
+	c := NewFilesClient(srv.URL, testToken, time.Second)
 	if err := c.CreateRootFolder(context.Background(), "u1"); err == nil {
 		t.Fatal("očekivana greška za status 500")
 	}
@@ -52,7 +56,7 @@ func TestCreateRootFolder_Timeout(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	c := NewFilesClient(srv.URL, 100*time.Millisecond)
+	c := NewFilesClient(srv.URL, testToken, 100*time.Millisecond)
 	start := time.Now()
 	if err := c.CreateRootFolder(context.Background(), "u1"); err == nil {
 		t.Fatal("očekivana greška zbog timeout-a")
@@ -67,7 +71,7 @@ func TestCreateRootFolder_Unreachable(t *testing.T) {
 	url := srv.URL
 	srv.Close()
 
-	c := NewFilesClient(url, time.Second)
+	c := NewFilesClient(url, testToken, time.Second)
 	if err := c.CreateRootFolder(context.Background(), "u1"); err == nil {
 		t.Fatal("očekivana greška za nedostupan servis")
 	}
