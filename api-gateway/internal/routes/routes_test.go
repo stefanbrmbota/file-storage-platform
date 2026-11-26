@@ -68,6 +68,8 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 		{"POST", "/api/auth/logout", Users, "/logout"},
 		{"GET", "/api/users/me", Users, "/users/me"},
 		{"POST", "/api/users/me/password", Users, "/users/me/password"},
+		{"POST", "/api/users/me/quota-requests", Users, "/users/me/quota-requests"},
+		{"GET", "/api/users/me/quota-requests/latest", Users, "/users/me/quota-requests/latest"},
 		{"GET", "/api/admin/users", Users, "/admin/users"},
 		{"POST", "/api/folders", Files, "/folders"},
 		{"GET", "/api/folders/f1/contents", Files, "/folders/f1/contents"},

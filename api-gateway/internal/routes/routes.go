@@ -75,6 +75,9 @@ var All = []Route{
 	{"GET /api/users/me", Users, User},
 	// Promena lozinke (US-14); Users posle uspeha opoziva token kojim je zahtev poslat.
 	{"POST /api/users/me/password", Users, User},
+	// Zahtev za povecanje kvote i status poslednjeg zahteva (US-21).
+	{"POST /api/users/me/quota-requests", Users, User},
+	{"GET /api/users/me/quota-requests/latest", Users, User},
 	{"GET /api/admin/users", Users, Admin},
 
 	// Files: folderi, datoteke, pretraga.

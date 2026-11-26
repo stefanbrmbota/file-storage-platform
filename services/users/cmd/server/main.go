@@ -162,6 +162,14 @@ func main() {
 	}
 	magicLogin := service.NewMagicLoginService(userRepo, magicRepo, tokens)
 
+	// US-21: zahtevi korisnika za povecanje kvote.
+	quotaRequestRepo, err := repository.NewQuotaRequestRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("quota request repository init failed", "err", err)
+		os.Exit(1)
+	}
+	quotaRequests := service.NewQuotaRequestService(userRepo, quotaRequestRepo)
+
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
 	if err != nil {
@@ -177,6 +185,9 @@ func main() {
 	mux.HandleFunc("POST /logout", handler.LogoutHandler(logout))
 	// US-06: nalog i kvota prijavljenog korisnika; identitet dolazi iz X-User-ID (postavlja gateway).
 	mux.HandleFunc("GET /users/me", handler.MeHandler(accounts))
+	// US-21: zahtev za povecanje kvote i status poslednjeg zahteva; identitet iz X-User-ID.
+	mux.HandleFunc("POST /users/me/quota-requests", handler.SubmitQuotaRequestHandler(quotaRequests))
+	mux.HandleFunc("GET /users/me/quota-requests/latest", handler.LatestQuotaRequestHandler(quotaRequests))
 	// US-14: promena lozinke prijavljenog korisnika; posle uspeha se opoziva token zahteva.
 	mux.HandleFunc("POST /users/me/password", handler.ChangePasswordHandler(passwords))
 	// US-15: reset zaboravljene lozinke mejlom; javne rute (gateway ih ne trazi JWT).
