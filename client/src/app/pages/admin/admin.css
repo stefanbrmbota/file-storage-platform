@@ -15,6 +15,12 @@
   background: #ffebe9;
 }
 
+.admin__ok {
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
 .admin__scroll {
   overflow-x: auto;
 }
@@ -77,4 +83,17 @@ button {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+td button + button {
+  margin-left: 6px;
+}
+
+.admin__reject {
+  background: var(--danger);
 }

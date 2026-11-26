@@ -262,6 +262,8 @@ Zaštićena stranica `/admin` (`pages/admin/`), samo za administratora:
 - **Korisnici** (`GET /api/admin/users`): ime i prezime, email, kvota i zauzeće; oznake za administratora i neaktivan nalog.
 - Svaka lista se učitava i ponavlja nezavisno, pa greška jedne ne skriva drugu.
 
+Odluka o zahtevu (US-23, T-23.4): uz svaki zahtev na čekanju su dugmad „Odobri“ i „Odbij“ (`POST /api/admin/quota-requests/{id}/approve` odnosno `/reject`, bez tela). Dok poziv traje, dugmad su onemogućena. Posle uspeha, kao i posle `404`/`409` (stanje se promenilo, npr. odluku je doneo drugi administrator), obe liste se osvežavaju, pa se vide novi status zahteva i nova kvota korisnika. Greške servera prikazuju se iznad tabele.
+
 Ruta ima `canActivate: [authGuard, adminGuard]`. `adminGuard` (`pages/admin/admin.guard.ts`) čita ulogu iz tokena i običnog korisnika vraća na početnu; to je samo olakšanje za korisnika, a pravo pristupa stvarno proveravaju gateway (`role = ADMIN`) i Users servis (uloga iz baze). Link „Administracija“ je na `/profil` i vidi ga samo administrator; stavka u glavnom meniju nije dodata jer `layout/` zahteva dogovor sa AP.
 
 ## 4. Provera pre commit-a
