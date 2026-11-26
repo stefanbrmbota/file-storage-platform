@@ -9,7 +9,10 @@
             [routerLink]="item.path"
             routerLinkActive="nav__link--active"
             [routerLinkActiveOptions]="{ exact: item.path === '/' }"
-            >{{ item.label }}</a
+            >{{ item.label }}
+            @if (item.path === notificationsPath && unread() > 0) {
+              <span class="badge" [attr.aria-label]="unread() + ' neprocitanih'">{{ unread() > 99 ? '99+' : unread() }}</span>
+            }</a
           >
         }
       </nav>

@@ -77,6 +77,13 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/folderi/folderi').then((m) => m.Folderi),
       },
       {
+        // Obavestenja prijavljenog korisnika (US-08, T-08.2); zasticena stranica.
+        path: 'obavestenja',
+        canActivate: [authGuard],
+        title: 'Obaveštenja | File Storage',
+        loadComponent: () => import('./pages/obavestenja/obavestenja').then((m) => m.Obavestenja),
+      },
+      {
         path: '**',
         title: 'Stranica ne postoji | File Storage',
         loadComponent: () => import('./pages/not-found/not-found').then((m) => m.NotFound),
