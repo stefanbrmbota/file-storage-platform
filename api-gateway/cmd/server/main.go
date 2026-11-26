@@ -15,6 +15,7 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/cors"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/proxy"
 	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/routes"
+	"github.com/stefanbrmbota/file-storage-platform/api-gateway/internal/secheaders"
 )
 
 func main() {
@@ -47,7 +48,8 @@ func main() {
 	// gateway, posle provere tokena i opoziva.
 	mux.Handle("GET /api/auth/session", authenticator.Require(auth.SessionHandler()))
 
-	srv := newServer(cfg, cors.Middleware(cfg.CORSAllowedOrigins, mux))
+	// Bezbednosna zaglavlja na svakom odgovoru, i na greskama (US-62, T-62.1).
+	srv := newServer(cfg, secheaders.Middleware(cors.Middleware(cfg.CORSAllowedOrigins, mux)))
 
 	go func() {
 		logger.Info("gateway service started", "port", cfg.Port,
