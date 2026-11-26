@@ -204,6 +204,22 @@ Posle uspeha Users servis opoziva token zahteva, pa klijent briše sačuvani tok
 i traži novu prijavu novom lozinkom. Za demonstraciju skrati `PASSWORD_MIN_AGE`
 (npr. `1m`) u `services/users/.env`; podrazumevano lozinka mora biti stara 24 h.
 
+## 3.11 Zaboravljena lozinka i reset (US-15, T-15.5)
+
+Javne stranice (bez prijave):
+
+| Ruta | Stranica | Šta radi |
+|---|---|---|
+| `/zaboravljena-lozinka` | `pages/zaboravljena-lozinka/` | Unos emaila (link „Zaboravio si lozinku?“ je na `/prijava`); šalje `POST /api/auth/password-reset/request`. Server uvek odgovara isto, pa stranica uvek prikazuje opštu poruku „Proverite mejl“ i ne otkriva da li nalog postoji. |
+| `/reset-lozinke` | `pages/reset-lozinke/` | Ovde vodi link iz mejla: `/reset-lozinke#token=...`. Stranica pročita token iz fragmenta i ukloni ga iz adrese, pa uz novu lozinku šalje `POST /api/auth/password-reset/confirm` (token u telu). Pravila lozinke su ista kao pri registraciji (`pages/registracija/password-rules.ts`). Greške servera se prikazuju u formi, a link „Zatraži novi“ je uvek na stranici. |
+
+Adresu linka određuje `RESET_URL_BASE` u `services/users/.env.example`
+(`http://localhost:3000/reset-lozinke`); mejl se vidi u MailHog-u
+(http://localhost:8025). Ako promeniš rutu `/reset-lozinke`, promeni i tu
+promenljivu. Link važi `PASSWORD_RESET_TTL` (podrazumevano 15 min) i može se
+iskoristiti samo jednom; za demonstraciju se rokovi mogu skratiti u
+`services/users/.env`.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.
