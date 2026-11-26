@@ -51,6 +51,8 @@ describe('Profil (kvota i zauzece)', () => {
   });
 
   afterEach(() => {
+    // Ugradjeni zahtev za kvotu (US-21) pri otvaranju trazi status; ovde nema podnetog zahteva.
+    http.match(`${GW}/api/users/me/quota-requests/latest`).forEach((r) => r.flush({ error: 'nema' }, { status: 404, statusText: 'Not Found' }));
     http.verify();
     vi.restoreAllMocks();
   });

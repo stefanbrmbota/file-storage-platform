@@ -242,6 +242,18 @@ promenljivu. Link važi `MAGIC_LINK_TTL` (podrazumevano 10 min); za demonstracij
 se rok može skratiti u `services/users/.env`. Prijava linkom radi i kad je lozinka
 istekla (US-16): to je način da se pristup povrati, a lozinka se zatim menja na profilu.
 
+## 3.13 Zahtev za povećanje kvote (US-21, T-21.4)
+
+Na stranici `/profil`, ispod kvote, komponenta `pages/profil/zahtev-kvote.ts`:
+
+- pri otvaranju čita `GET /api/users/me/quota-requests/latest` (`404` znači da zahtev još nije podnet) i prikazuje status poslednjeg zahteva: na čekanju, odobren ili odbijen;
+- dok je zahtev na čekanju forma se ne prikazuje; inače korisnik unosi željenu kvotu (GB ili MB, decimalni zarez je dozvoljen) i šalje `POST /api/users/me/quota-requests` sa `{requestedBytes}`;
+- klijent proverava da je vrednost pozitivan broj, veća od trenutne kvote i najviše 1 PiB (isto kao server); greške servera (`400`, `409`) prikazuju se u formi, a posle `409` se osvežava status.
+
+Klijent ne šalje nikakav ID korisnika: identitet određuje gateway iz tokena.
+Odluku administratora (US-23) korisnik vidi kad ponovo otvori `/profil`; trenutna
+kvota na kartici se menja tek tada.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.
