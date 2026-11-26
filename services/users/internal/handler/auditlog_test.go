@@ -60,6 +60,7 @@ func TestLoginAttemptLogged(t *testing.T) {
 	}{
 		{"uspeh", nil, "success", "INFO"},
 		{"neuspeh", service.ErrInvalidCredentials, "failure", "WARN"},
+		{"istekla lozinka", service.ErrPasswordExpired, "expired", "WARN"},
 		{"interna greska", errors.New("smtp pao"), "error", "WARN"},
 	}
 	for _, tc := range tests {
@@ -98,6 +99,7 @@ func TestLoginVerifyAttemptLogged(t *testing.T) {
 	}{
 		{"uspeh", nil, "success"},
 		{"neuspeh", service.ErrInvalidOTP, "failure"},
+		{"istekla lozinka", service.ErrPasswordExpired, "expired"},
 		{"interna greska", errors.New("baza pala"), "error"},
 	}
 	for _, tc := range tests {

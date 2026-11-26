@@ -32,7 +32,8 @@ type loginVerifyRequest struct {
 
 // LoginVerifyHandler proverava OTP i vraća JWT. Pogrešan, istekao, već
 // iskorišćen kod, nepostojeći i neaktivan nalog dobijaju istu poruku (401).
-// Kod i token se nikad ne loguju.
+// Ako je lozinka istekla (US-16), a kod je ispravan, odgovor je 403 sa uputom za
+// reset i token se ne izdaje. Kod i token se nikad ne loguju.
 func LoginVerifyHandler(l LoginFinisher) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		r.Body = http.MaxBytesReader(w, r.Body, maxLoginVerifyBody)
@@ -57,6 +58,9 @@ func LoginVerifyHandler(l LoginFinisher) http.HandlerFunc {
 		case errors.Is(err, service.ErrInvalidOTP):
 			logLoginAttempt(r, stepVerify, req.Email, outcomeFailure)
 			writeError(w, http.StatusUnauthorized, "neispravan ili istekao kod")
+		case errors.Is(err, service.ErrPasswordExpired):
+			logLoginAttempt(r, stepVerify, req.Email, outcomeExpired)
+			writeError(w, http.StatusForbidden, passwordExpiredMessage)
 		default:
 			logLoginAttempt(r, stepVerify, req.Email, outcomeError)
 			slog.Error("prijava (drugi korak) nije uspela", "err", err)

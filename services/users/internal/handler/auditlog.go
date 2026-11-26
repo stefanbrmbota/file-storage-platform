@@ -18,6 +18,7 @@ const (
 	outcomeSuccess = "success"
 	outcomeFailure = "failure" // odbijen pokušaj (pogrešni podaci, pogrešan kod)
 	outcomeError   = "error"   // interna greška, pokušaj nije mogao biti obrađen
+	outcomeExpired = "expired" // lozinka je istekla (US-16): prijava je onemogućena do reseta lozinke
 
 	maxLoggedEmailLen = 254
 )
@@ -25,7 +26,9 @@ const (
 // logLoginAttempt upisuje jedan zapis o pokušaju prijave: korak, email, IP
 // adresu i ishod (vreme dodaje slog). Namerno ne prima lozinku, OTP ni token,
 // pa ne mogu završiti u logu. Razlog odbijanja se ne upisuje: log ne sme da
-// otkrije ono što odgovor klijentu skriva (npr. da nalog postoji).
+// otkrije ono što odgovor klijentu skriva (npr. da nalog postoji). Izuzetak je
+// ishod "expired" (US-16): do njega se stiže tek posle tačne lozinke odnosno OTP-a,
+// pa ne otkriva ništa novo, a to je događaj koji treba da bude vidljiv u reviziji.
 func logLoginAttempt(r *http.Request, step, email, outcome string) {
 	level := slog.LevelInfo
 	if outcome != outcomeSuccess {
