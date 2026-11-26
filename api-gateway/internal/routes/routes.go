@@ -120,14 +120,34 @@ type Guard interface {
 	RequireAdmin(http.Handler) http.Handler
 }
 
+// Limits ogranicava broj zahteva (US-63, T-63.1). Public se primenjuje na
+// javne rute (po IP adresi, jer korisnik jos nije poznat), a User na
+// zasticene, POSLE provere tokena, pa broji po korisniku iz tokena.
+// Nil polje znaci bez ogranicenja.
+type Limits struct {
+	Public func(http.Handler) http.Handler
+	User   func(http.Handler) http.Handler
+}
+
+func apply(limit func(http.Handler) http.Handler, h http.Handler) http.Handler {
+	if limit == nil {
+		return h
+	}
+	return limit(h)
+}
+
 // Register registruje sve rute na mux, i 404 za svaku putanju koja nije na
 // listi. upstreams za svaki servis daje handler koji prosledjuje zahtev
-// (proxy.New), a guard proverava token na rutama koje nisu javne. Servis bez
-// handlera ili nil guard je greska u konfiguraciji i izaziva panic pri
-// pokretanju.
-func Register(mux *http.ServeMux, upstreams map[Service]http.Handler, guard Guard) {
+// (proxy.New), a guard proverava token na rutama koje nisu javne. limits
+// (opciono) ogranicava broj zahteva. Servis bez handlera ili nil guard je
+// greska u konfiguraciji i izaziva panic pri pokretanju.
+func Register(mux *http.ServeMux, upstreams map[Service]http.Handler, guard Guard, limits ...Limits) {
 	if guard == nil {
 		panic("routes: guard je obavezan")
+	}
+	var lim Limits
+	if len(limits) > 0 {
+		lim = limits[0]
 	}
 	for _, rt := range All {
 		h, ok := upstreams[rt.Service]
@@ -137,10 +157,11 @@ func Register(mux *http.ServeMux, upstreams map[Service]http.Handler, guard Guar
 		h = stripPrefix(h)
 		switch rt.Access {
 		case Public:
+			h = apply(lim.Public, h)
 		case Admin:
-			h = guard.RequireAdmin(h)
+			h = guard.RequireAdmin(apply(lim.User, h))
 		default:
-			h = guard.Require(h)
+			h = guard.Require(apply(lim.User, h))
 		}
 		mux.Handle(rt.Pattern, h)
 	}
