@@ -28,7 +28,7 @@ func Health(p Pinger) http.HandlerFunc {
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
+	setJSONHeaders(w)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }

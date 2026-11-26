@@ -37,7 +37,7 @@ func roleAllowed(role model.Role, allowed []model.Role) bool {
 
 // writeError šalje grešku klijentu kao JSON {"error": "..."} bez internih detalja.
 func writeError(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
+	setJSONHeaders(w)
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

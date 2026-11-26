@@ -42,7 +42,7 @@ func MeHandler(a AccountGetter) http.HandlerFunc {
 		acc, err := a.Get(ctx, id)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.Header().Set("Cache-Control", "no-store") // lični podaci
 			_ = json.NewEncoder(w).Encode(acc)
 		case errors.Is(err, service.ErrUserNotFound):

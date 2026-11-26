@@ -72,7 +72,7 @@ func (s *ConfirmationService) Issue(ctx context.Context, u model.User) error {
 	link := s.baseURL + "#token=" + raw
 	subject := "Potvrda registracije"
 	body := fmt.Sprintf("Zdravo %s,\n\nza aktivaciju naloga otvorite sledeći link:\n\n%s\n\nLink važi do %s i može se iskoristiti samo jednom.\nAko se niste registrovali, ignorišite ovaj mejl.\n",
-		u.FirstName, link, expires.Format("02.01.2006. 15:04 MST"))
+		mailName(u.FirstName), link, expires.Format("02.01.2006. 15:04 MST"))
 	if err := s.mailer.Send(ctx, u.Email, subject, body); err != nil {
 		return fmt.Errorf("potvrda: slanje mejla: %w", err)
 	}

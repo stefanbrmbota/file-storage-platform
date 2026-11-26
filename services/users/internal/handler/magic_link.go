@@ -67,7 +67,7 @@ func MagicLinkRequestHandler(m MagicLinkRequester) http.HandlerFunc {
 		err := m.Request(ctx, req.Email)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": magicRequestMessage})
 		case errors.Is(err, service.ErrInvalidEmail):
@@ -105,7 +105,7 @@ func MagicLinkLoginHandler(m MagicLinkLoginer) http.HandlerFunc {
 		switch {
 		case err == nil:
 			logMagicLinkAttempt(r, outcomeSuccess)
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
 		case errors.Is(err, service.ErrInvalidToken):
 			logMagicLinkAttempt(r, outcomeFailure)

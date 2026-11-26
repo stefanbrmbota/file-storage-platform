@@ -66,7 +66,7 @@ func PasswordResetRequestHandler(p PasswordResetRequester) http.HandlerFunc {
 		err := p.Request(ctx, req.Email)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.WriteHeader(http.StatusAccepted)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": resetRequestMessage})
 		case errors.Is(err, service.ErrInvalidEmail):

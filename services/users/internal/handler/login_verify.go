@@ -53,7 +53,7 @@ func LoginVerifyHandler(l LoginFinisher) http.HandlerFunc {
 		switch {
 		case err == nil:
 			logLoginAttempt(r, stepVerify, req.Email, outcomeSuccess)
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(map[string]string{"token": tok})
 		case errors.Is(err, service.ErrInvalidOTP):
 			logLoginAttempt(r, stepVerify, req.Email, outcomeFailure)

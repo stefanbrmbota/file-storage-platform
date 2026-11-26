@@ -48,7 +48,7 @@ func TokenCheckHandler(c RevocationChecker) http.HandlerFunc {
 			writeError(w, http.StatusServiceUnavailable, "servis trenutno nije dostupan")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
+		setJSONHeaders(w)
 		_ = json.NewEncoder(w).Encode(map[string]bool{"revoked": revoked})
 	}
 }

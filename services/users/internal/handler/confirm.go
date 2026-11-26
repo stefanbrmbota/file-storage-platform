@@ -46,7 +46,7 @@ func ConfirmHandler(c Confirmer) http.HandlerFunc {
 		err := c.Confirm(ctx, req.Token)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "nalog je aktiviran"})
 		case errors.Is(err, service.ErrInvalidToken):
 			writeError(w, http.StatusBadRequest, "link je nevažeći, istekao ili je već iskorišćen")

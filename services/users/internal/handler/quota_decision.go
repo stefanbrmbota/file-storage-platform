@@ -49,7 +49,7 @@ func quotaDecisionHandler(decide func(ctx context.Context, adminID, requestID st
 		req, err := decide(ctx, adminID, requestID)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.Header().Set("Cache-Control", "no-store")
 			_ = json.NewEncoder(w).Encode(req)
 		case errors.Is(err, service.ErrForbidden):

@@ -138,7 +138,7 @@ func (s *PasswordResetService) sendResetMail(parent context.Context, u model.Use
 
 	subject := "Reset lozinke"
 	body := fmt.Sprintf("Zdravo %s,\n\nprimili smo zahtev za reset lozinke. Za izbor nove lozinke otvorite sledeći link:\n\n%s\n\nLink važi do %s i može se iskoristiti samo jednom.\nAko niste tražili reset, ignorišite ovaj mejl: vaša lozinka ostaje ista.\n",
-		u.FirstName, link, expires.Format("02.01.2006. 15:04 MST"))
+		mailName(u.FirstName), link, expires.Format("02.01.2006. 15:04 MST"))
 	if err := s.mailer.Send(ctx, u.Email, subject, body); err != nil {
 		slog.Error("reset lozinke: slanje mejla nije uspelo", "userId", u.ID, "err", err)
 		if derr := s.tokens.Delete(ctx, u.ID); derr != nil {
