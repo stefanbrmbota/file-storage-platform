@@ -56,6 +56,19 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/reset-lozinke/reset-lozinke').then((m) => m.ResetLozinke),
       },
       {
+        // Povracaj naloga magicnim linkom (US-17, T-17.5): unos emaila; prijavljen korisnik se vraca na pocetnu.
+        path: 'povracaj-naloga',
+        canActivate: [guestGuard],
+        title: 'Povraćaj naloga | File Storage',
+        loadComponent: () => import('./pages/povracaj-naloga/povracaj-naloga').then((m) => m.PovracajNaloga),
+      },
+      {
+        // Prijava magicnim linkom: ovde vodi link iz mejla (/magicni-link#token=...); javna, bez guard-a.
+        path: 'magicni-link',
+        title: 'Prijava linkom | File Storage',
+        loadComponent: () => import('./pages/magicni-link/magicni-link').then((m) => m.MagicniLink),
+      },
+      {
         // Profil i kvota skladista (US-06, T-06.3); zasticena stranica.
         path: 'profil',
         canActivate: [authGuard],

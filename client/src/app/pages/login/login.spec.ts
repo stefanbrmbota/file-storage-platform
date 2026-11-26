@@ -142,4 +142,13 @@ describe('Login (prijava u dva koraka)', () => {
     await passStepOne(fixture);
     expect(el.querySelector('a[href="/zaboravljena-lozinka"]')).toBeNull();
   });
+
+  it('prvi korak ima link za povraćaj naloga magičnim linkom (US-17), a drugi korak nema', async () => {
+    const fixture = setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('a[href="/povracaj-naloga"]')?.textContent).toContain('Povraćaj naloga');
+
+    await passStepOne(fixture);
+    expect(el.querySelector('a[href="/povracaj-naloga"]')).toBeNull();
+  });
 });

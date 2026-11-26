@@ -1,0 +1,31 @@
+<section class="pn">
+  @if (sentMessage(); as message) {
+    <h1>Proverite mejl</h1>
+    <p class="pn__info" role="status">{{ message }}</p>
+    <p class="pn__info">Link važi kratko i može se iskoristiti samo jednom. Ako mejl ne stigne, proveri i neželjenu poštu pa pokušaj ponovo za minut.</p>
+    <p><a routerLink="/prijava">Nazad na prijavu</a></p>
+  } @else {
+    <h1>Povraćaj naloga</h1>
+    <p class="pn__info">Unesi email naloga. Poslaćemo ti link koji te prijavljuje bez lozinke.</p>
+
+    @if (error()) {
+      <p class="pn__error" role="alert">{{ error() }}</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+      <label>
+        Email
+        <input type="email" formControlName="email" autocomplete="username" autofocus />
+      </label>
+      @if (form.controls.email.touched && form.controls.email.invalid) {
+        <small class="pn__hint">
+          {{ form.controls.email.errors?.['required'] ? 'Unesi email.' : 'Unesi ispravan email (najviše 254 znaka).' }}
+        </small>
+      }
+
+      <button type="submit" [disabled]="busy()">{{ busy() ? 'Šaljem…' : 'Pošalji link' }}</button>
+    </form>
+
+    <p class="pn__info"><a routerLink="/prijava">Nazad na prijavu</a></p>
+  }
+</section>
