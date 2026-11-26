@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
+import { ACCEPT_ATTR, validateFileType, validateNewVersionType } from './file-types';
 import { apiErrorMessage } from '../../core/http/api-error';
 import { FileItem, FilesApi, Folder, FolderContents, formatSize, validateName } from './files-api';
 
@@ -44,6 +45,7 @@ export class Folderi implements OnInit {
   protected readonly renameValue = signal('');
 
   protected readonly formatSize = formatSize;
+  protected readonly accept = ACCEPT_ATTR;
 
   ngOnInit(): void {
     // Isti komponent prikazuje svaki folder: kad se promeni :id u adresi,
@@ -140,7 +142,7 @@ export class Folderi implements OnInit {
     const c = this.contents();
     input.value = ''; // isti fajl može ponovo da se izabere
     if (!file || !c) return;
-    const invalid = validateName(file.name);
+    const invalid = validateName(file.name) ?? validateFileType(file.name);
     if (invalid) {
       this.actionError.set(invalid);
       return;
@@ -153,6 +155,11 @@ export class Folderi implements OnInit {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    const invalid = validateNewVersionType(target.name, file.name);
+    if (invalid) {
+      this.actionError.set(invalid);
+      return;
+    }
     this.run(this.api.uploadNewVersion(target.id, file));
   }
 

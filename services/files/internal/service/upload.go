@@ -48,11 +48,18 @@ type FileService struct {
 	files   FileWriter
 	objects ObjectStore
 	quota   QuotaClient
+	types   *FileTypePolicy
 	now     func() time.Time
 }
 
 func NewFileService(folders *FolderService, files FileWriter, objects ObjectStore, quota QuotaClient) *FileService {
-	return &FileService{folders: folders, files: files, objects: objects, quota: quota, now: time.Now}
+	return &FileService{folders: folders, files: files, objects: objects, quota: quota, types: NewFileTypePolicy(nil), now: time.Now}
+}
+
+// WithFileTypes postavlja whitelist ekstenzija za otpremanje (US-65).
+func (s *FileService) WithFileTypes(p *FileTypePolicy) *FileService {
+	s.types = p
+	return s
 }
 
 // UploadInput is one file the user wants to upload.
@@ -79,6 +86,13 @@ func (s *FileService) Upload(ctx context.Context, in UploadInput) (*model.File, 
 	if err := validateName(name); err != nil {
 		return nil, err
 	}
+	// Tip datoteke po whitelisti, po ekstenziji i po sadržaju (US-65).
+	// Content-Type koji je poslao klijent se ne koristi.
+	contentType, content, err := s.types.Check(name, in.Content)
+	if err != nil {
+		return nil, err
+	}
+	in.ContentType, in.Content = contentType, content
 	if in.Size < 0 {
 		return nil, ErrInvalidSize
 	}

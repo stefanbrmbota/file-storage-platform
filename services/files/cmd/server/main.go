@@ -69,7 +69,8 @@ func main() {
 		logger.Warn("INTERNAL_TOKEN is not set: the Users service will refuse quota calls and uploads will fail")
 	}
 	users := client.NewUsersClient(cfg.UsersServiceURL, cfg.InternalToken, cfg.RequestTimeout)
-	files := service.NewFileService(folders, fileRepo, objects, users)
+	files := service.NewFileService(folders, fileRepo, objects, users).
+		WithFileTypes(service.NewFileTypePolicy(cfg.AllowedExtensions))
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,

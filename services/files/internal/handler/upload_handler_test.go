@@ -186,6 +186,12 @@ func TestUploadEndpointErrors(t *testing.T) {
 		{"someone else's folder", nil, func(t *testing.T) (io.Reader, string) {
 			return multipartBody(t, "file", "a.txt", "x")
 		}, "marko", http.StatusNotFound},
+		{"file type not allowed", nil, func(t *testing.T) (io.Reader, string) {
+			return multipartBody(t, "file", "skripta.exe", "MZ")
+		}, "ana", http.StatusUnsupportedMediaType},
+		{"content does not match extension", nil, func(t *testing.T) (io.Reader, string) {
+			return multipartBody(t, "file", "slika.png", "<html><script>alert(1)</script>")
+		}, "ana", http.StatusUnsupportedMediaType},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
