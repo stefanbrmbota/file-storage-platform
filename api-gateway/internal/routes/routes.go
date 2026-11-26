@@ -79,6 +79,8 @@ var All = []Route{
 	{"POST /api/users/me/quota-requests", Users, User},
 	{"GET /api/users/me/quota-requests/latest", Users, User},
 	{"GET /api/admin/users", Users, Admin},
+	// Admin pregled zahteva za kvotu (US-22).
+	{"GET /api/admin/quota-requests", Users, Admin},
 
 	// Files: folderi, datoteke, pretraga.
 	{"POST /api/folders", Files, User},

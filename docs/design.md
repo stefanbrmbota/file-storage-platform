@@ -896,6 +896,8 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0) i `passwordExpiresAt` (UTC; poslednja promena lozinke + `PASSWORD_MAX_AGE`, US-16: posle tog trenutka prijava nije moguća dok se lozinka ne promeni). Identitet samo iz `X-User-ID`; bez heša lozinke. |
 | `POST /api/users/me/quota-requests` | Users | da | US-21 | Zahtev za povećanje kvote: `{requestedBytes}` (veće od trenutne kvote, najviše 1 PiB). `201` sa zahtevom (`status: PENDING`); `400` neispravna vrednost ili nije veća od kvote; `409` korisnik već ima zahtev na čekanju. Identitet samo iz `X-User-ID`. |
 | `GET /api/users/me/quota-requests/latest` | Users | da | US-21 | Najnoviji zahtev prijavljenog korisnika sa statusom (`PENDING`, `APPROVED`, `REJECTED`). `404` ako još nije podneo nijedan. Korisnik vidi samo svoje zahteve. |
+| `GET /api/admin/users` | Users | ADMIN | US-22 | Administratorski pregled korisnika: `{users: [{id, firstName, lastName, email, role, active, quotaBytes, usedBytes}]}`, od najnovijeg, najviše 200. Bez heša lozinke. |
+| `GET /api/admin/quota-requests` | Users | ADMIN | US-22 | Administratorski pregled zahteva za kvotu: `{requests: [{id, userId, firstName, lastName, email, currentQuotaBytes, requestedBytes, status, createdAt, decidedAt?}]}`; prvo zahtevi na čekanju, pa ostali (od najnovijeg), najviše 200. Ako je nalog podnosioca obrisan, ime, email i trenutna kvota su prazni. |
 | `POST /api/users/me/password` | Users | da | US-14 | Promena lozinke: `{currentPassword, newPassword, newPasswordConfirm}`. Nova lozinka mora biti jaka i različita od trenutne, a trenutna lozinka stara najmanje `PASSWORD_MIN_AGE` (podrazumevano 24h). Uspeh `204`, pa se token zahteva opoziva i korisnik se ponovo prijavljuje. Greške: `400` pravila lozinke, `403` pogrešna trenutna lozinka (namerno ne `401`), `409` prerano menjanje ili istovremena promena. |
 | `GET /api/auth/session` | gateway | da | US-32 | Odgovara sam gateway posle provere tokena i opoziva: `{userId, role}`. Klijent proverava da li sačuvan token još važi (npr. posle odjave u drugom tabu). |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |
@@ -905,7 +907,6 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 
 | Metoda i putanja (gateway) | Servis | JWT | Opis |
 |---|---|---|---|
-| `GET /api/admin/users` | Users | ADMIN | Admin pregled korisnika (US-24). |
 | `PATCH /api/folders/{id}` | Files | da | Preimenovanje ili premeštanje foldera. |
 | `DELETE /api/folders/{id}` | Files | da | Brisanje foldera sa sadržajem. |
 | `POST /api/folders/{id}/files` | Files | da | Otpremanje datoteke (`multipart/form-data`). |
