@@ -43,6 +43,19 @@ export const routes: Routes = [
         loadComponent: () => import('./pages/potvrda/potvrda').then((m) => m.Potvrda),
       },
       {
+        // Zaboravljena lozinka (US-15, T-15.5): unos emaila; prijavljen korisnik se vraca na pocetnu.
+        path: 'zaboravljena-lozinka',
+        canActivate: [guestGuard],
+        title: 'Zaboravljena lozinka | File Storage',
+        loadComponent: () => import('./pages/zaboravljena-lozinka/zaboravljena-lozinka').then((m) => m.ZaboravljenaLozinka),
+      },
+      {
+        // Reset lozinke: ovde vodi link iz mejla (/reset-lozinke#token=...); javna, bez guard-a.
+        path: 'reset-lozinke',
+        title: 'Nova lozinka | File Storage',
+        loadComponent: () => import('./pages/reset-lozinke/reset-lozinke').then((m) => m.ResetLozinke),
+      },
+      {
         // Profil i kvota skladista (US-06, T-06.3); zasticena stranica.
         path: 'profil',
         canActivate: [authGuard],

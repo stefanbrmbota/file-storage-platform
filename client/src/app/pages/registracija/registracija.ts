@@ -4,11 +4,11 @@ import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Va
 import { RouterLink } from '@angular/router';
 import { ConfigService } from '../../core/config.service';
 import { apiErrorMessage } from '../../core/http/api-error';
+import { emailValidator } from './email-rules';
 import { charCount, passwordValidator, passwordsMatch } from './password-rules';
 
 /** Granice isto kao u Users servisu (service/registration_validation.go). */
 const MAX_NAME = 50;
-const MAX_EMAIL = 254;
 
 /** Ime ili prezime: obavezno (bez razmaka na krajevima) i najvise 50 karaktera. */
 const nameValidator: ValidatorFn = (c: AbstractControl): ValidationErrors | null => {
@@ -17,18 +17,6 @@ const nameValidator: ValidatorFn = (c: AbstractControl): ValidationErrors | null
     return { required: true };
   }
   return charCount(v) > MAX_NAME ? { maxlength: true } : null;
-};
-
-/** Email: obavezan, najvise 254 znaka, oblik a@b.c (domen sa tackom). */
-const emailValidator: ValidatorFn = (c: AbstractControl): ValidationErrors | null => {
-  const v = String(c.value ?? '').trim();
-  if (v === '') {
-    return { required: true };
-  }
-  if (v.length > MAX_EMAIL) {
-    return { maxlength: true };
-  }
-  return /^[^@\s]+@[^@\s.][^@\s]*\.[^@\s.]+$/.test(v) ? null : { email: true };
 };
 
 /**

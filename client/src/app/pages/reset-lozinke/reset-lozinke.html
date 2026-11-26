@@ -1,0 +1,61 @@
+<section class="rl">
+  @switch (state()) {
+    @case ('done') {
+      <h1>Lozinka je promenjena</h1>
+      <p class="rl__ok" role="status">Možeš da se prijaviš novom lozinkom.</p>
+      <p><a class="rl__button" routerLink="/prijava">Prijavi se</a></p>
+    }
+    @case ('missing') {
+      <h1>Reset lozinke</h1>
+      <p class="rl__error" role="alert">
+        Link za reset nije ispravan. Otvori link iz mejla u celosti ili zatraži novi.
+      </p>
+      <p><a routerLink="/zaboravljena-lozinka">Zatraži novi link</a></p>
+    }
+    @default {
+      <h1>Nova lozinka</h1>
+
+      @if (error()) {
+        <p class="rl__error" role="alert">{{ error() }}</p>
+      }
+
+      <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+        <label>
+          Nova lozinka
+          <input type="password" formControlName="newPassword" autocomplete="new-password" autofocus />
+        </label>
+        @if (form.controls.newPassword.touched && form.controls.newPassword.errors; as e) {
+          <small class="rl__hint">
+            @if (e['required']) {
+              Unesi novu lozinku.
+            } @else {
+              Lozinka mora imati:
+              <ul>
+                @if (e['minlength']) { <li>najmanje 8 karaktera</li> }
+                @if (e['maxlength']) { <li>najviše 128 karaktera</li> }
+                @if (e['upper']) { <li>veliko slovo</li> }
+                @if (e['lower']) { <li>malo slovo</li> }
+                @if (e['digit']) { <li>broj</li> }
+                @if (e['special']) { <li>specijalni znak</li> }
+              </ul>
+            }
+          </small>
+        }
+
+        <label>
+          Ponovljena nova lozinka
+          <input type="password" formControlName="newPasswordConfirm" autocomplete="new-password" />
+        </label>
+        @if (form.controls.newPasswordConfirm.touched && form.controls.newPasswordConfirm.errors?.['required']) {
+          <small class="rl__hint">Ponovi novu lozinku.</small>
+        } @else if (form.controls.newPasswordConfirm.touched && form.errors?.['mismatch']) {
+          <small class="rl__hint">Lozinke se ne poklapaju.</small>
+        }
+
+        <button type="submit" [disabled]="busy()">{{ busy() ? 'Menjam…' : 'Postavi lozinku' }}</button>
+      </form>
+
+      <p class="rl__alt">Link ne radi? <a routerLink="/zaboravljena-lozinka">Zatraži novi</a></p>
+    }
+  }
+</section>

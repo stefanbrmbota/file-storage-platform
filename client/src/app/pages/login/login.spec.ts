@@ -133,4 +133,13 @@ describe('Login (prijava u dva koraka)', () => {
     await submit(fixture);
     http.expectNone(`${GW}/api/auth/login`);
   });
+
+  it('prvi korak ima link za zaboravljenu lozinku (US-15), a drugi korak nema', async () => {
+    const fixture = setup();
+    const el = fixture.nativeElement as HTMLElement;
+    expect(el.querySelector('a[href="/zaboravljena-lozinka"]')?.textContent).toContain('Zaboravio si lozinku?');
+
+    await passStepOne(fixture);
+    expect(el.querySelector('a[href="/zaboravljena-lozinka"]')).toBeNull();
+  });
 });
