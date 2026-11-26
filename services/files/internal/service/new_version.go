@@ -47,8 +47,8 @@ func (s *FileService) UploadNewVersion(ctx context.Context, in NewVersionInput) 
 	if err != nil {
 		return nil, err
 	}
-	if file.OwnerID != in.OwnerID {
-		return nil, ErrFileNotFound
+	if err := checkFileWrite(in.OwnerID, file); err != nil {
+		return nil, err
 	}
 
 	// Step 2: only the difference counts. A file that grows from 10 MB to
