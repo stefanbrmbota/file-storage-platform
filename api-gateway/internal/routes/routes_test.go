@@ -71,6 +71,7 @@ func TestRoutesReachServiceWithoutPrefix(t *testing.T) {
 		{"POST", "/api/users/me/quota-requests", Users, "/users/me/quota-requests"},
 		{"GET", "/api/users/me/quota-requests/latest", Users, "/users/me/quota-requests/latest"},
 		{"GET", "/api/admin/users", Users, "/admin/users"},
+		{"GET", "/api/admin/quota-requests", Users, "/admin/quota-requests"},
 		{"POST", "/api/folders", Files, "/folders"},
 		{"GET", "/api/folders/f1/contents", Files, "/folders/f1/contents"},
 		{"PATCH", "/api/folders/f1", Files, "/folders/f1"},
@@ -120,7 +121,7 @@ func TestAccessLevels(t *testing.T) {
 		"POST /api/auth/password-reset/request": true, "POST /api/auth/password-reset/confirm": true,
 		"POST /api/auth/magic-link/request": true, "POST /api/auth/magic-link/login": true,
 	}
-	admin := map[string]bool{"GET /api/admin/users": true}
+	admin := map[string]bool{"GET /api/admin/users": true, "GET /api/admin/quota-requests": true}
 
 	for _, rt := range All {
 		t.Run(rt.Pattern, func(t *testing.T) {
