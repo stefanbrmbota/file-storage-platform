@@ -18,6 +18,9 @@ const HeaderUserID = "X-User-ID"
 // maxCursorLen ogranicava kursor pre parsiranja (timeuuid ima 36 znakova).
 const maxCursorLen = 64
 
+// maxUserIDLen je ista granica kao u Users i Files servisu (US-64).
+const maxUserIDLen = 128
+
 // Lister je citanje obavestenja (service.Notifications).
 type Lister interface {
 	List(ctx context.Context, userID, cursor string, limit int) (service.Page, error)
@@ -38,8 +41,8 @@ func ListNotifications(l Lister) http.HandlerFunc {
 		limit := 0
 		if v := q.Get("limit"); v != "" {
 			n, err := strconv.Atoi(v)
-			if err != nil || n < 1 {
-				writeError(w, http.StatusBadRequest, "limit mora biti pozitivan ceo broj")
+			if err != nil || n < 1 || n > service.MaxLimit {
+				writeError(w, http.StatusBadRequest, "limit mora biti ceo broj od 1 do 100")
 				return
 			}
 			limit = n
@@ -82,7 +85,7 @@ func UnreadCount(l Lister) http.HandlerFunc {
 // kroz gateway (ili token nije proveren), pa se odbija sa 401.
 func currentUser(w http.ResponseWriter, r *http.Request) (string, bool) {
 	id := strings.TrimSpace(r.Header.Get(HeaderUserID))
-	if id == "" {
+	if id == "" || len(id) > maxUserIDLen {
 		writeError(w, http.StatusUnauthorized, "unauthorized")
 		return "", false
 	}

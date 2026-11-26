@@ -102,6 +102,9 @@ func (s *FolderService) findParent(ctx context.Context, ownerID, parentID string
 	if parentID == "" {
 		parent, err = s.store.FindRoot(ctx, ownerID)
 	} else {
+		if err := validateID(parentID); err != nil {
+			return nil, err
+		}
 		parent, err = s.store.FindByID(ctx, parentID)
 	}
 	if errors.Is(err, repository.ErrNotFound) {
@@ -131,7 +134,8 @@ func (s *FolderService) newFolder(name, ownerID, parentID string) *model.Folder 
 }
 
 // validateName allows any readable name up to 255 characters, except
-// path separators, control characters and the special names "." and "..".
+// path separators, control characters, the special characters <>:"|?*
+// (US-64) and the special names "." and "..".
 func validateName(name string) error {
 	if name == "" || name == "." || name == ".." {
 		return ErrInvalidName
@@ -140,7 +144,7 @@ func validateName(name string) error {
 		return ErrInvalidName
 	}
 	for _, r := range name {
-		if r == '/' || r == '\\' || unicode.IsControl(r) {
+		if r == '/' || r == '\\' || unicode.IsControl(r) || strings.ContainsRune(forbiddenNameChars, r) {
 			return ErrInvalidName
 		}
 	}

@@ -56,7 +56,8 @@ func TestRenameFolderEndpointErrors(t *testing.T) {
 		{"invalid name", "/folders/" + fakultet.ID, `{"name":"a/b"}`, "ana", http.StatusBadRequest},
 		{"root folder", "/folders/" + root.Folder.ID, `{"name":"x"}`, "ana", http.StatusBadRequest},
 		{"name taken", "/folders/" + slike.ID, `{"name":"Fakultet"}`, "ana", http.StatusConflict},
-		{"unknown folder", "/folders/nope", `{"name":"x"}`, "ana", http.StatusNotFound},
+		{"unknown folder", "/folders/00000000-0000-4000-8000-000000000000", `{"name":"x"}`, "ana", http.StatusNotFound},
+		{"invalid id", "/folders/nope", `{"name":"x"}`, "ana", http.StatusBadRequest},
 		{"someone else's folder", "/folders/" + fakultet.ID, `{"name":"x"}`, "marko", http.StatusNotFound},
 	}
 	for _, tc := range tests {
@@ -72,7 +73,7 @@ func TestRenameFolderEndpointErrors(t *testing.T) {
 func TestRenameFileEndpoint(t *testing.T) {
 	h, _, files := newTestHandlerWithFiles(t)
 
-	rec := patch(h, "/files/f1", `{"name":"biografija.pdf"}`, "ana")
+	rec := patch(h, "/files/11111111-1111-4111-8111-111111111111", `{"name":"biografija.pdf"}`, "ana")
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d, body %s", rec.Code, http.StatusOK, rec.Body)
 	}
@@ -84,8 +85,9 @@ func TestRenameFileEndpoint(t *testing.T) {
 		name, path, user string
 		want             int
 	}{
-		{"unknown file", "/files/nope", "ana", http.StatusNotFound},
-		{"someone else's file", "/files/f1", "marko", http.StatusNotFound},
+		{"unknown file", "/files/00000000-0000-4000-8000-000000000000", "ana", http.StatusNotFound},
+		{"invalid id", "/files/nope", "ana", http.StatusBadRequest},
+		{"someone else's file", "/files/11111111-1111-4111-8111-111111111111", "marko", http.StatusNotFound},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rec := patch(h, tc.path, `{"name":"x.txt"}`, tc.user)

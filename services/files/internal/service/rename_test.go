@@ -52,7 +52,8 @@ func TestRenameFolderErrors(t *testing.T) {
 		{"empty name", "ana", fakultet.ID, "  ", ErrInvalidName},
 		{"name taken in same parent", "ana", fakultet.ID, "Slike", ErrNameTaken},
 		{"root folder", "ana", root.ID, "Moj root", ErrCannotRenameRoot},
-		{"unknown folder", "ana", "does-not-exist", "x", ErrFolderNotFound},
+		{"unknown folder", "ana", "00000000-0000-4000-8000-000000000000", "x", ErrFolderNotFound},
+		{"invalid folder id", "ana", "does-not-exist", "x", ErrInvalidID},
 		{"someone else's folder", "marko", fakultet.ID, "x", ErrFolderNotFound},
 	}
 	for _, tc := range tests {
@@ -84,11 +85,11 @@ func TestRenameFile(t *testing.T) {
 	ctx := context.Background()
 	files := svc.files.(*fakeFileStore)
 	files.files = []model.File{
-		{ID: "f1", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID},
-		{ID: "f2", Name: "slika.png", OwnerID: "ana", ParentID: root.ID},
+		{ID: "11111111-1111-4111-8111-111111111111", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID},
+		{ID: "22222222-2222-4222-8222-222222222222", Name: "slika.png", OwnerID: "ana", ParentID: root.ID},
 	}
 
-	got, err := svc.RenameFile(ctx, "ana", "f1", "biografija.pdf")
+	got, err := svc.RenameFile(ctx, "ana", "11111111-1111-4111-8111-111111111111", "biografija.pdf")
 	if err != nil {
 		t.Fatalf("RenameFile: %v", err)
 	}
@@ -103,10 +104,11 @@ func TestRenameFile(t *testing.T) {
 		newName string
 		want    error
 	}{
-		{"invalid name", "ana", "f1", `a\b`, ErrInvalidName},
-		{"name taken in same folder", "ana", "f1", "slika.png", ErrNameTaken},
-		{"unknown file", "ana", "missing", "x", ErrFileNotFound},
-		{"someone else's file", "marko", "f1", "x", ErrFileNotFound},
+		{"invalid name", "ana", "11111111-1111-4111-8111-111111111111", `a\b`, ErrInvalidName},
+		{"name taken in same folder", "ana", "11111111-1111-4111-8111-111111111111", "slika.png", ErrNameTaken},
+		{"unknown file", "ana", "00000000-0000-4000-8000-000000000000", "x", ErrFileNotFound},
+		{"invalid file id", "ana", "missing", "x", ErrInvalidID},
+		{"someone else's file", "marko", "11111111-1111-4111-8111-111111111111", "x", ErrFileNotFound},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {

@@ -122,7 +122,8 @@ func (h *Handler) createRootFolder(w http.ResponseWriter, r *http.Request) {
 // writeFolderError maps service errors to HTTP status codes.
 func writeFolderError(w http.ResponseWriter, err error) {
 	switch {
-	case errors.Is(err, service.ErrInvalidName), errors.Is(err, service.ErrCannotRenameRoot):
+	case errors.Is(err, service.ErrInvalidName), errors.Is(err, service.ErrCannotRenameRoot),
+		errors.Is(err, service.ErrInvalidID):
 		writeError(w, http.StatusBadRequest, err.Error())
 	case errors.Is(err, service.ErrParentNotFound), errors.Is(err, service.ErrFolderNotFound),
 		errors.Is(err, service.ErrFileNotFound):

@@ -253,7 +253,8 @@ func TestNewVersionEndpointErrors(t *testing.T) {
 		want               int
 	}{
 		{"no user", fileID, "", http.StatusUnauthorized},
-		{"unknown file", "nope", "ana", http.StatusNotFound},
+		{"unknown file", "00000000-0000-4000-8000-000000000000", "ana", http.StatusNotFound},
+		{"invalid file id", "nope", "ana", http.StatusBadRequest},
 		{"not the owner", fileID, "marko", http.StatusNotFound},
 	}
 	for _, tc := range tests {

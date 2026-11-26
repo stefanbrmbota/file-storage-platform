@@ -66,6 +66,9 @@ func (s *FolderService) ownFolder(ctx context.Context, ownerID, folderID string)
 	if folderID == "" || folderID == RootFolderID {
 		folder, err = s.store.FindRoot(ctx, ownerID)
 	} else {
+		if err := validateID(folderID); err != nil {
+			return nil, err
+		}
 		folder, err = s.store.FindByID(ctx, folderID)
 	}
 	if errors.Is(err, repository.ErrNotFound) {

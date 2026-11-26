@@ -50,10 +50,15 @@ func ReleaseQuotaHandler(q QuotaReleaser) http.HandlerFunc {
 			return
 		}
 
+		userID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(r.Context(), quotaCheckTimeout)
 		defer cancel()
 
-		used, err := q.ReleaseQuota(ctx, r.PathValue("id"), req.Bytes)
+		used, err := q.ReleaseQuota(ctx, userID, req.Bytes)
 		switch {
 		case err == nil:
 			w.Header().Set("Content-Type", "application/json")
@@ -89,10 +94,15 @@ func ReserveQuotaHandler(q QuotaReserver) http.HandlerFunc {
 			return
 		}
 
+		userID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
+
 		ctx, cancel := context.WithTimeout(r.Context(), quotaCheckTimeout)
 		defer cancel()
 
-		remaining, err := q.ReserveQuota(ctx, r.PathValue("id"), req.Bytes)
+		remaining, err := q.ReserveQuota(ctx, userID, req.Bytes)
 		switch {
 		case err == nil:
 			w.Header().Set("Content-Type", "application/json")

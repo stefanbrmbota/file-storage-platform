@@ -167,7 +167,9 @@ func TestUploadRejectedBeforeAnythingIsStored(t *testing.T) {
 		{"users service down", func(e *uploadEnv, _ *UploadInput) { e.quota.down = true }, ErrQuotaUnavailable},
 		{"invalid name", func(_ *uploadEnv, in *UploadInput) { in.Name = "a/b.txt" }, ErrInvalidName},
 		{"negative size", func(_ *uploadEnv, in *UploadInput) { in.Size = -1 }, ErrInvalidSize},
-		{"unknown folder", func(_ *uploadEnv, in *UploadInput) { in.FolderID = "nope" }, ErrFolderNotFound},
+		{"unknown folder", func(_ *uploadEnv, in *UploadInput) { in.FolderID = "00000000-0000-4000-8000-000000000000" }, ErrFolderNotFound},
+		{"invalid folder id", func(_ *uploadEnv, in *UploadInput) { in.FolderID = "nope" }, ErrInvalidID},
+		{"forbidden character", func(_ *uploadEnv, in *UploadInput) { in.Name = "a?.txt" }, ErrInvalidName},
 		{"someone else's folder", func(_ *uploadEnv, in *UploadInput) { in.OwnerID = "marko" }, ErrFolderNotFound},
 	}
 	for _, tc := range tests {

@@ -117,7 +117,7 @@ func newTestHandlerWithFiles(t *testing.T) (*Handler, *model.Folder, *memFiles) 
 		t.Fatal(err)
 	}
 	root, _ := folders.FindRoot(ctx, "ana")
-	files.items = []*model.File{{ID: "f1", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID}}
+	files.items = []*model.File{{ID: "11111111-1111-4111-8111-111111111111", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID}}
 	return New(svc, nil, 0), fakultet, files
 }
 
@@ -178,7 +178,8 @@ func TestFolderContentsErrors(t *testing.T) {
 		want int
 	}{
 		{"no user", "root", "", http.StatusUnauthorized},
-		{"unknown folder", "does-not-exist", "ana", http.StatusNotFound},
+		{"unknown folder", "00000000-0000-4000-8000-000000000000", "ana", http.StatusNotFound},
+		{"invalid id", "does-not-exist", "ana", http.StatusBadRequest},
 		{"someone else's folder", fakultet.ID, "marko", http.StatusNotFound},
 	}
 	for _, tc := range tests {
