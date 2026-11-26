@@ -1,6 +1,6 @@
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { ConfigService } from '../../core/config.service';
 import { apiErrorMessage } from '../../core/http/api-error';
 import { formatSize } from '../folderi/files-api';
@@ -37,11 +37,20 @@ const STATUS_LABEL: Record<AdminQuotaRequest['status'], string> = {
   REJECTED: 'odbijen',
 };
 
+export type Decision = 'approve' | 'reject';
+
+const DECISION_DONE: Record<Decision, string> = {
+  approve: 'odobren',
+  reject: 'odbijen',
+};
+
 /**
- * Administracija (US-22, T-22.4): lista korisnika (ime, email, kvota, zauzece) i
+ * Administracija (US-22, T-22.4; odluke US-23, T-23.4): lista korisnika (ime, email, kvota, zauzece) i
  * lista zahteva za kvotu (podnosilac, trenutna i trazena kvota, status). Samo za
  * administratora (adminGuard); pravo stvarno proveravaju gateway i Users servis.
  * Svaka lista se ucitava i ponavlja nezavisno, pa greska jedne ne skriva drugu.
+ * Zahtev na cekanju se odobrava ili odbija dugmetom; posle odluke se obe liste
+ * osvezavaju (status zahteva i kvota korisnika).
  */
 @Component({
   selector: 'app-admin',
@@ -60,6 +69,11 @@ export class Admin implements OnInit {
   protected readonly requests = signal<AdminQuotaRequest[]>([]);
   protected readonly requestsLoading = signal(true);
   protected readonly requestsError = signal<string | null>(null);
+
+  /** True dok traje odluka o zahtevu; dugmad su tada onemogucena (nema dvostrukog klika). */
+  protected readonly deciding = signal(false);
+  protected readonly decisionError = signal<string | null>(null);
+  protected readonly decisionInfo = signal<string | null>(null);
 
   protected readonly formatSize = formatSize;
   protected readonly statusLabel = (s: AdminQuotaRequest['status']) => STATUS_LABEL[s];
@@ -97,6 +111,37 @@ export class Admin implements OnInit {
         this.requests.set([]);
         this.requestsError.set(apiErrorMessage(err));
         this.requestsLoading.set(false);
+      },
+    });
+  }
+
+  /**
+   * Odobrava ili odbija zahtev na cekanju (POST .../approve ili .../reject).
+   * Posle uspeha i posle 404/409 (stanje se promenilo, npr. odluku je donela druga
+   * osoba) liste se osvezavaju, da tabela pokazuje stvarno stanje.
+   */
+  protected decide(r: AdminQuotaRequest, action: Decision): void {
+    if (this.deciding() || r.status !== 'PENDING') {
+      return;
+    }
+    this.deciding.set(true);
+    this.decisionError.set(null);
+    this.decisionInfo.set(null);
+    const url = `${this.config.gatewayUrl}/api/admin/quota-requests/${encodeURIComponent(r.id)}/${action}`;
+    this.http.post<AdminQuotaRequest>(url, null).subscribe({
+      next: () => {
+        this.deciding.set(false);
+        this.decisionInfo.set(`Zahtev za ${formatSize(r.requestedBytes)} (${this.requester(r)}) je ${DECISION_DONE[action]}.`);
+        this.loadRequests();
+        this.loadUsers();
+      },
+      error: (err: unknown) => {
+        this.deciding.set(false);
+        this.decisionError.set(apiErrorMessage(err));
+        if (err instanceof HttpErrorResponse && (err.status === 404 || err.status === 409)) {
+          this.loadRequests();
+          this.loadUsers();
+        }
       },
     });
   }

@@ -2,6 +2,12 @@
   <h1>Administracija</h1>
 
   <h2>Zahtevi za kvotu</h2>
+  @if (decisionInfo()) {
+    <p class="admin__ok" role="status">{{ decisionInfo() }}</p>
+  }
+  @if (decisionError()) {
+    <p class="admin__error" role="alert">{{ decisionError() }}</p>
+  }
   @if (requestsLoading()) {
     <p class="admin__info">Učitavam…</p>
   } @else if (requestsError()) {
@@ -20,6 +26,7 @@
             <th>Tražena kvota</th>
             <th>Status</th>
             <th>Podnet</th>
+            <th>Odluka</th>
           </tr>
         </thead>
         <tbody>
@@ -39,6 +46,14 @@
                 >
               </td>
               <td>{{ r.createdAt | date: 'dd.MM.yyyy. HH:mm' }}</td>
+              <td>
+                @if (r.status === 'PENDING') {
+                  <button type="button" class="admin__approve" [disabled]="deciding()" (click)="decide(r, 'approve')">Odobri</button>
+                  <button type="button" class="admin__reject" [disabled]="deciding()" (click)="decide(r, 'reject')">Odbij</button>
+                } @else if (r.decidedAt) {
+                  {{ r.decidedAt | date: 'dd.MM.yyyy. HH:mm' }}
+                }
+              </td>
             </tr>
           }
         </tbody>

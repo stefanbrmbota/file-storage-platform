@@ -143,4 +143,103 @@ describe('Administracija (korisnici i zahtevi za kvotu)', () => {
     expect(el(f).textContent).toContain('Nema korisnika.');
     expect(el(f).textContent).toContain('Nema zahteva za kvotu.');
   });
+
+  describe('odluka o zahtevu (US-23)', () => {
+    const button = (f: ReturnType<typeof setup>, cls: string) => el(f).querySelector<HTMLButtonElement>(`.admin__requests .${cls}`)!;
+
+    /** Odgovara na ponovno ucitavanje obe liste posle odluke. */
+    function flushReload(users: AdminUser[], requests: AdminQuotaRequest[]) {
+      http.expectOne(REQUESTS).flush({ requests });
+      http.expectOne(USERS).flush({ users });
+    }
+
+    it('samo zahtev na čekanju ima dugmad „Odobri“ i „Odbij“, a odlučen prikazuje vreme odluke', async () => {
+      const f = await open([], [
+        request({ id: 'a', status: 'PENDING' }),
+        request({ id: 'b', status: 'APPROVED', decidedAt: '2026-11-26T14:00:00Z' }),
+        request({ id: 'c', status: 'REJECTED' }),
+      ]);
+      const rows = el(f).querySelectorAll('.admin__requests tbody tr');
+      expect(rows[0].querySelectorAll('button').length).toBe(2);
+      expect(rows[0].querySelector('.admin__approve')?.textContent).toContain('Odobri');
+      expect(rows[0].querySelector('.admin__reject')?.textContent).toContain('Odbij');
+      expect(rows[1].querySelector('button')).toBeNull();
+      expect(rows[1].textContent?.trim()).toMatch(/\d{2}\.\d{2}\.\d{4}\. \d{2}:\d{2}$/);
+      expect(rows[2].querySelector('button')).toBeNull();
+    });
+
+    it('„Odobri“ šalje POST bez tela, osvežava obe liste i javlja ishod', async () => {
+      const f = await open([user()], [request()]);
+      button(f, 'admin__approve').click();
+
+      const req = http.expectOne(`${REQUESTS}/r1/approve`);
+      expect(req.request.method).toBe('POST');
+      expect(req.request.body).toBeNull();
+      req.flush(request({ status: 'APPROVED' }));
+
+      flushReload([user({ quotaBytes: 5 * GB })], [request({ status: 'APPROVED', decidedAt: '2026-11-26T14:00:00Z' })]);
+      await f.whenStable();
+      f.detectChanges();
+
+      expect(el(f).querySelector('[role=status]')?.textContent).toContain('odobren');
+      expect(el(f).querySelector('.admin__requests tbody button')).toBeNull(); // vise nije na cekanju
+      expect(cells(el(f).querySelector('.admin__users tbody tr')!)[2]).toBe(formatSize(5 * GB)); // nova kvota
+    });
+
+    it('„Odbij“ šalje POST na reject', async () => {
+      const f = await open([user()], [request()]);
+      button(f, 'admin__reject').click();
+
+      http.expectOne(`${REQUESTS}/r1/reject`).flush(request({ status: 'REJECTED' }));
+      flushReload([user()], [request({ status: 'REJECTED' })]);
+      await f.whenStable();
+      f.detectChanges();
+
+      expect(el(f).querySelector('[role=status]')?.textContent).toContain('odbijen');
+    });
+
+    it('ID zahteva se kodira u adresi', async () => {
+      const f = await open([], [request({ id: 'a/b?c' })]);
+      button(f, 'admin__approve').click();
+      const req = http.expectOne(`${REQUESTS}/${encodeURIComponent('a/b?c')}/approve`);
+      expect(req.request.url).not.toContain('a/b?c');
+      req.flush(request());
+      flushReload([], []);
+    });
+
+    it('dok traje odluka dugmad su onemogućena i drugi klik ne šalje zahtev', async () => {
+      const f = await open([], [request({ id: 'a' }), request({ id: 'b' })]);
+      const first = el(f).querySelectorAll<HTMLButtonElement>('.admin__requests .admin__approve');
+      first[0].click();
+      f.detectChanges();
+      first[1].click(); // drugi zahtev dok prvi traje
+      const req = http.expectOne((r) => r.url.includes('/approve'));
+      expect(req.request.url).toContain('/a/approve');
+      expect(Array.from(el(f).querySelectorAll<HTMLButtonElement>('.admin__requests button')).every((b) => b.disabled)).toBe(true);
+      req.flush(request());
+      flushReload([], []);
+    });
+
+    it('409 (već odlučen) prikazuje poruku i osvežava liste', async () => {
+      const f = await open([], [request()]);
+      button(f, 'admin__approve').click();
+      http.expectOne(`${REQUESTS}/r1/approve`).flush({ error: 'zahtev je već odlučen' }, { status: 409, statusText: 'Conflict' });
+
+      flushReload([], [request({ status: 'REJECTED' })]);
+      await f.whenStable();
+      f.detectChanges();
+      expect(el(f).querySelector('[role=alert]')?.textContent).toContain('već odlučen');
+      expect(el(f).querySelector('.admin__requests tbody button')).toBeNull();
+    });
+
+    it('403 prikazuje poruku bez ponovnog učitavanja', async () => {
+      const f = await open([], [request()]);
+      button(f, 'admin__reject').click();
+      http.expectOne(`${REQUESTS}/r1/reject`).flush({ error: 'zabranjen pristup' }, { status: 403, statusText: 'Forbidden' });
+      f.detectChanges();
+
+      expect(el(f).querySelector('[role=alert]')?.textContent).toContain('zabranjen pristup');
+      expect(button(f, 'admin__reject').disabled).toBe(false); // moze ponovo
+    });
+  });
 });
