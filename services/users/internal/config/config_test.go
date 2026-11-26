@@ -205,6 +205,48 @@ func TestLoadPasswordResetSettings(t *testing.T) {
 	})
 }
 
+func TestLoadMagicLinkSettings(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevano", func(t *testing.T) {
+		t.Setenv("MAGIC_LINK_URL_BASE", "")
+		t.Setenv("MAGIC_LINK_TTL", "")
+		t.Setenv("MAGIC_LINK_COOLDOWN", "")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.MagicLinkURLBase != "http://localhost:3000/magicni-link" || cfg.MagicLinkTTL != 10*time.Minute || cfg.MagicLinkCooldown != time.Minute {
+			t.Errorf("neocekivano: %q %v %v", cfg.MagicLinkURLBase, cfg.MagicLinkTTL, cfg.MagicLinkCooldown)
+		}
+	})
+	t.Run("iz env", func(t *testing.T) {
+		t.Setenv("MAGIC_LINK_URL_BASE", "https://app.example/magicni-link")
+		t.Setenv("MAGIC_LINK_TTL", "2m")
+		t.Setenv("MAGIC_LINK_COOLDOWN", "10s")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.MagicLinkURLBase != "https://app.example/magicni-link" || cfg.MagicLinkTTL != 2*time.Minute || cfg.MagicLinkCooldown != 10*time.Second {
+			t.Errorf("neocekivano: %q %v %v", cfg.MagicLinkURLBase, cfg.MagicLinkTTL, cfg.MagicLinkCooldown)
+		}
+	})
+	t.Run("neispravno trajanje", func(t *testing.T) {
+		for _, key := range []string{"MAGIC_LINK_TTL", "MAGIC_LINK_COOLDOWN"} {
+			for _, bad := range []string{"abc", "0s", "-1m"} {
+				t.Setenv("MAGIC_LINK_TTL", "")
+				t.Setenv("MAGIC_LINK_COOLDOWN", "")
+				t.Setenv(key, bad)
+				if _, err := Load(); err == nil {
+					t.Errorf("%s=%q: ocekivana greska", key, bad)
+				}
+			}
+		}
+	})
+}
+
 func TestLoadJWTSettings(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "")
 	t.Setenv("ADMIN_PASSWORD", "")
