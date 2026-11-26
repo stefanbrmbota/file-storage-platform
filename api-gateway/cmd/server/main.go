@@ -56,8 +56,22 @@ func main() {
 	// gateway, posle provere tokena i opoziva.
 	mux.Handle("GET /api/auth/session", authenticator.Require(limits.User(auth.SessionHandler())))
 
+	// HTTPS izmedju klijenta i gateway-a (US-67).
+	tlsCfg, err := config.LoadTLS()
+	if err != nil {
+		logger.Error("neispravna TLS konfiguracija", "err", err)
+		os.Exit(1)
+	}
+
 	// Bezbednosna zaglavlja na svakom odgovoru, i na greskama (US-62, T-62.1).
-	srv := newServer(cfg, secheaders.Middleware(cors.Middleware(cfg.CORSAllowedOrigins, mux)))
+	var handler http.Handler = secheaders.Middleware(cors.Middleware(cfg.CORSAllowedOrigins, mux))
+	if tlsCfg.Enabled() {
+		handler = secheaders.HSTS(handler)
+		// Healthcheck kontejnera ne zna za sertifikat, pa ima svoj HTTP port na 127.0.0.1.
+		health := startHealthServer(tlsCfg.HealthPort, logger)
+		defer health.Close()
+	}
+	srv := newServer(cfg, handler)
 
 	go func() {
 		logger.Info("gateway service started", "port", cfg.Port,
@@ -70,8 +84,9 @@ func main() {
 			"analytics", cfg.AnalyticsURL.Host,
 			"cors_origins", cfg.CORSAllowedOrigins,
 			"rate_limit_public_per_min", cfg.RateLimitPublicPerMin,
-			"rate_limit_user_per_min", cfg.RateLimitUserPerMin)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			"rate_limit_user_per_min", cfg.RateLimitUserPerMin,
+			"tls", tlsCfg.Enabled())
+		if err := listen(srv, tlsCfg); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server failed", "err", err)
 			os.Exit(1)
 		}

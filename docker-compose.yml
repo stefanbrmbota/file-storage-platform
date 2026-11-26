@@ -1,6 +1,7 @@
 # Lokalno radno okruženje (US-33, T-33.2 i T-33.3): klijent, gateway, svi servisi i njihove baze.
 #
-#   docker compose up --build -d     podiže sve
+#   (jednom) cd api-gateway; go run ./cmd/devcert    sertifikati za HTTPS u certs/ (US-67)
+#   docker compose up --build -d     podiže sve; klijent je na https://localhost:3000
 #   docker compose ps                stanje i healthcheck
 #   docker compose logs -f users     logovi jednog servisa
 #   docker compose down              gasi (podaci ostaju u volume-ima)
@@ -48,10 +49,17 @@ services:
       NOTIFICATIONS_SERVICE_URL: http://notifications:8083
       SHARING_SERVICE_URL: http://sharing:8084
       ANALYTICS_SERVICE_URL: http://analytics:8085
+      # HTTPS (US-67): sertifikat iz certs/ (go run ./cmd/devcert u api-gateway).
+      GATEWAY_TLS_CERT_FILE: /certs/localhost.crt
+      GATEWAY_TLS_KEY_FILE: /certs/localhost.key
+      # Klijent se otvara preko https, pa je to njegov origin.
+      CORS_ALLOWED_ORIGINS: https://localhost:${CLIENT_PUBLIC_PORT:-3000}
+    volumes: ["./certs:/certs:ro"]
     ports:
       - "${GATEWAY_PUBLIC_PORT:-8080}:8080"
     networks: [backend, public]
-    healthcheck: { <<: *go-health, test: ["CMD", "/app/healthcheck", "8080"] }
+    # Sa TLS-om healthcheck ide na poseban HTTP port samo unutar kontejnera (GATEWAY_HEALTH_PORT).
+    healthcheck: { <<: *go-health, test: ["CMD", "/app/healthcheck", "8079"] }
     depends_on:
       users: { condition: service_healthy }
       files: { condition: service_healthy }
@@ -65,13 +73,15 @@ services:
     build: { context: client }
     restart: unless-stopped
     environment:
-      # Adresa gateway-a kako je vidi pretraživač (ne Docker mreža).
-      GATEWAY_URL: http://localhost:${GATEWAY_PUBLIC_PORT:-8080}
+      # Adresa gateway-a kako je vidi pretraživač (ne Docker mreža); HTTPS (US-67).
+      GATEWAY_URL: https://localhost:${GATEWAY_PUBLIC_PORT:-8080}
+    volumes: ["./certs:/certs:ro"]
     ports:
-      - "${CLIENT_PUBLIC_PORT:-3000}:8080"
+      # https://localhost:3000 (nginx sluša TLS na 8443).
+      - "${CLIENT_PUBLIC_PORT:-3000}:8443"
     networks: [public]
     healthcheck:
-      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/ || exit 1"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -92,6 +102,11 @@ services:
       SMTP_HOST: mailhog
       SMTP_PORT: "1025"
       FILES_SERVICE_URL: http://files:8082
+      # Linkovi u mejlovima vode na klijent preko https (US-67), da token iz
+      # linka nikad ne putuje nešifrovan.
+      CONFIRM_URL_BASE: https://localhost:${CLIENT_PUBLIC_PORT:-3000}/potvrda
+      RESET_URL_BASE: https://localhost:${CLIENT_PUBLIC_PORT:-3000}/reset-lozinke
+      MAGIC_LINK_URL_BASE: https://localhost:${CLIENT_PUBLIC_PORT:-3000}/magicni-link
       JWT_SECRET: ${JWT_SECRET:-change-me-jwt-secret-at-least-32-chars}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-change-me-internal-token-at-least-32-chars}
     expose: ["8081"]
