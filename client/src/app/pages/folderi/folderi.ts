@@ -4,7 +4,7 @@ import { DatePipe } from '@angular/common';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Observable } from 'rxjs';
 import { apiErrorMessage } from '../../core/http/api-error';
-import { FileItem, FilesApi, Folder, FolderContents, formatSize, validateName } from './files-api';
+import { FileItem, FilesApi, Folder, FolderContents, formatSize, isValidFolderId, validateName } from './files-api';
 
 /** Šta se trenutno preimenuje (folder ili datoteka) i njegov id. */
 interface RenameTarget {
@@ -58,6 +58,13 @@ export class Folderi implements OnInit {
     this.loadError.set(null);
     this.actionError.set(null);
     this.renaming.set(null);
+    // Neispravan id iz adrese se ne šalje serveru (whitelist, US-64).
+    if (!isValidFolderId(folderId)) {
+      this.contents.set(null);
+      this.loadError.set('Folder ne postoji.');
+      this.loading.set(false);
+      return;
+    }
     this.api.contents(folderId).subscribe({
       next: (c) => {
         this.contents.set(c);

@@ -3,7 +3,7 @@ import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
 import { Folderi } from './folderi';
-import { FolderContents, formatSize, validateName } from './files-api';
+import { FolderContents, formatSize, isValidFolderId, validateName } from './files-api';
 import { ConfigService } from '../../core/config.service';
 
 const GW = 'http://gw.test/api';
@@ -130,6 +130,17 @@ describe('validateName i formatSize', () => {
     expect(validateName('..')).not.toBeNull();
     expect(validateName('a\\b')).not.toBeNull();
     expect(validateName('x'.repeat(256))).not.toBeNull();
+    expect(validateName('a<script>')).not.toBeNull();
+    expect(validateName('izvestaj?.pdf')).not.toBeNull();
+    expect(validateName('a:b|c*"d')).not.toBeNull();
+  });
+
+  it('prihvata samo root ili UUID kao id foldera', () => {
+    expect(isValidFolderId('root')).toBe(true);
+    expect(isValidFolderId('6f1c2b1e-3c1a-4c55-9d1e-2b8f0a9e7c11')).toBe(true);
+    expect(isValidFolderId('..')).toBe(false);
+    expect(isValidFolderId('1 OR 1=1')).toBe(false);
+    expect(isValidFolderId('{"$ne":null}')).toBe(false);
   });
 
   it('prikazuje veličinu čitljivo', () => {
