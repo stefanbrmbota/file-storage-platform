@@ -12,22 +12,30 @@ import (
 	"time"
 )
 
+// internalTokenHeader je zaglavlje kojim se Users predstavlja Files servisu
+// na internim rutama (isto kao handler.InternalTokenHeader).
+const internalTokenHeader = "X-Internal-Token"
+
 // FilesClient poziva Files servis.
 type FilesClient struct {
-	baseURL string
-	http    *http.Client
-	timeout time.Duration
+	baseURL       string
+	internalToken string
+	http          *http.Client
+	timeout       time.Duration
 }
 
 // NewFilesClient vraća klijenta za Files servis; svaki poziv ima timeout.
-func NewFilesClient(baseURL string, timeout time.Duration) *FilesClient {
+// internalToken (INTERNAL_TOKEN) se šalje u X-Internal-Token, jer Files
+// interne rute propušta samo uz njega (US-62, T-62.2).
+func NewFilesClient(baseURL, internalToken string, timeout time.Duration) *FilesClient {
 	if timeout <= 0 {
 		timeout = 5 * time.Second
 	}
 	return &FilesClient{
-		baseURL: strings.TrimRight(baseURL, "/"),
-		http:    &http.Client{Timeout: timeout},
-		timeout: timeout,
+		baseURL:       strings.TrimRight(baseURL, "/"),
+		internalToken: internalToken,
+		http:          &http.Client{Timeout: timeout},
+		timeout:       timeout,
 	}
 }
 
@@ -46,6 +54,7 @@ func (c *FilesClient) CreateRootFolder(ctx context.Context, userID string) error
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(internalTokenHeader, c.internalToken)
 
 	resp, err := c.http.Do(req)
 	if err != nil {

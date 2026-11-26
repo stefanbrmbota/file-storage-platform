@@ -73,7 +73,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           handler.New(folders, files, cfg.MaxUploadBytes).Routes(),
+		Handler:           handler.New(folders, files, cfg.MaxUploadBytes).WithInternalToken(cfg.InternalToken).Routes(),
 		ReadHeaderTimeout: 5 * time.Second,
 		// Uploads (and later downloads) of big files take time. WriteTimeout
 		// counts from the end of the request headers to the end of the
