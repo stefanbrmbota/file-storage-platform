@@ -33,3 +33,6 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# Sertifikati za lokalni HTTPS (US-67): pravi ih api-gateway/cmd/devcert, kljucevi se ne commituju.
+certs/
