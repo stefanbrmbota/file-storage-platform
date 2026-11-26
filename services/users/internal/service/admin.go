@@ -59,10 +59,16 @@ func NewAdminService(accounts AccountFinder, users repository.UserLister, reques
 // requireAdmin proverava ulogu u bazi, a ne samo zaglavlje koje šalje gateway:
 // uloga u tokenu može biti zastarela, a servis je poslednja linija odbrane.
 func (s *AdminService) requireAdmin(ctx context.Context, adminID string) error {
+	return requireActiveAdmin(ctx, s.accounts, adminID)
+}
+
+// requireActiveAdmin vraća ErrForbidden ako pozivalac nije aktivan administrator
+// (isto za prazan ID i nepoznat nalog); kvar baze se vraća kao obična greška.
+func requireActiveAdmin(ctx context.Context, accounts AccountFinder, adminID string) error {
 	if strings.TrimSpace(adminID) == "" {
 		return ErrForbidden
 	}
-	u, err := s.accounts.FindByID(ctx, adminID)
+	u, err := accounts.FindByID(ctx, adminID)
 	switch {
 	case err == nil:
 	case errors.Is(err, repository.ErrNotFound):
