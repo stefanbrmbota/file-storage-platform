@@ -43,6 +43,7 @@ type Config struct {
 	JWTTTL    time.Duration // rok vazenja JWT-a
 
 	PasswordMinAge time.Duration // najkrace vreme od poslednje promene lozinke do sledece (US-14)
+	PasswordMaxAge time.Duration // najduze vreme vazenja lozinke; posle toga prijava nije moguca (US-16)
 
 	ResetURLBase          string        // klijentska stranica za reset lozinke; token ide u #fragment (US-15)
 	PasswordResetTTL      time.Duration // rok vazenja linka za reset lozinke
@@ -111,6 +112,13 @@ func Load() (Config, error) {
 	}
 	if cfg.PasswordMinAge, err = getDuration("PASSWORD_MIN_AGE", 24*time.Hour); err != nil {
 		return Config{}, err
+	}
+	if cfg.PasswordMaxAge, err = getDuration("PASSWORD_MAX_AGE", 60*24*time.Hour); err != nil {
+		return Config{}, err
+	}
+	// Lozinku koja se ne sme menjati duze nego sto vazi bilo bi nemoguce promeniti na vreme.
+	if cfg.PasswordMaxAge <= cfg.PasswordMinAge {
+		return Config{}, errors.New("config: PASSWORD_MAX_AGE mora biti duži od PASSWORD_MIN_AGE")
 	}
 	if cfg.PasswordResetTTL, err = getDuration("PASSWORD_RESET_TTL", 15*time.Minute); err != nil {
 		return Config{}, err

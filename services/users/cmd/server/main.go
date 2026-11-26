@@ -105,9 +105,9 @@ func main() {
 		logger.Error("neispravna JWT konfiguracija (JWT_SECRET, JWT_TTL)", "err", err)
 		os.Exit(1)
 	}
-	login, err := service.NewLoginService(userRepo, otpService, tokens, mailer, cfg.OTPTTL, params)
+	login, err := service.NewLoginService(userRepo, otpService, tokens, mailer, cfg.OTPTTL, params, cfg.PasswordMaxAge)
 	if err != nil {
-		logger.Error("login servis init failed", "err", err)
+		logger.Error("login servis init failed (PASSWORD_MAX_AGE)", "err", err)
 		os.Exit(1)
 	}
 
@@ -118,7 +118,11 @@ func main() {
 	}
 	logout := service.NewLogoutService(tokens, revokedRepo)
 	quota := service.NewQuotaService(userRepo)
-	accounts := service.NewAccountService(userRepo)
+	accounts, err := service.NewAccountService(userRepo, cfg.PasswordMaxAge)
+	if err != nil {
+		logger.Error("neispravna konfiguracija podataka o nalogu (PASSWORD_MAX_AGE)", "err", err)
+		os.Exit(1)
+	}
 	passwords, err := service.NewPasswordService(userRepo, tokens, revokedRepo, params, cfg.PasswordMinAge)
 	if err != nil {
 		logger.Error("neispravna konfiguracija promene lozinke (ARGON2_*, PASSWORD_MIN_AGE)", "err", err)

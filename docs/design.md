@@ -254,6 +254,16 @@ održava ovako:
   `model.NewUser` uvek postavlja `USER`.
 - Upiti koriste `bson.D` / `bson.M` sa vrednostima kao parametrima, bez spajanja
   stringova sa korisničkim ulazom (zaštita od NoSQL injekcije).
+- **Istek lozinke (US-16):** lozinka važi najviše `PASSWORD_MAX_AGE` (podrazumevano
+  1440h = 60 dana, mora biti duže od `PASSWORD_MIN_AGE`) od `passwordChangedAt`
+  (ako polja nema, od `createdAt`). Posle toga prijava je onemogućena dok se
+  lozinka ne promeni resetom mejlom (US-15), koji `passwordChangedAt` postavlja na
+  "sada". Provera je u **oba** koraka prijave, ali tek posle dokaza znanja (tačna
+  lozinka odnosno OTP), pa pogrešna lozinka isteklog naloga i dalje daje isti `401`
+  kao svaki drugi neuspeh i ne otkriva stanje naloga. Odgovor je `403` sa uputom za
+  reset. Svaki takav pokušaj upisuje se u log kao `pokusaj prijave` sa
+  `outcome=expired` (email, IP, korak), što je tražena auditabilnost naloga. Na
+  odbrani se rok skraćuje u `services/users/.env` (npr. `PASSWORD_MAX_AGE=2m`).
 
 ### 1.6 Predlozi (nije implementirano)
 
@@ -830,12 +840,12 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 |---|---|---|---|---|
 | `POST /api/auth/register` | Users | ne | US-04 | Registracija; šalje mejl sa linkom za potvrdu. |
 | `POST /api/auth/confirm` | Users | ne | US-04 | Potvrda registracije tokenom iz linka (token u telu zahteva, ne u URL-u). |
-| `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. |
-| `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
+| `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. `401` za sve pogrešne podatke (ista poruka). `403` ako je lozinka istekla (US-16), ali tek posle tačne lozinke; OTP se tada ne šalje. |
+| `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. `403` ako je lozinka istekla između koraka (US-16), tek posle ispravnog OTP-a; token se tada ne izdaje. |
 | `POST /api/auth/password-reset/request` | Users | ne | US-15 | Zahtev za reset zaboravljene lozinke: `{email}`. Za svaki ispravan zahtev isti odgovor `202` (ne otkriva da li nalog postoji); za aktivan nalog šalje mejl sa linkom (`#token=...`, važi `PASSWORD_RESET_TTL`, podrazumevano 15 min; najviše jedan mejl po `PASSWORD_RESET_COOLDOWN`). |
 | `POST /api/auth/password-reset/confirm` | Users | ne | US-15 | Nova lozinka linkom iz mejla: `{token, newPassword, newPasswordConfirm}` (token u telu). `204`; `400` nova lozinka nije prihvatljiva ili je link nevažeći, istekao ili iskorišćen; `409` istovremena promena. Ne traži minimalnu starost lozinke. |
 | `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
-| `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0). Identitet samo iz `X-User-ID`; bez heša lozinke. |
+| `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0) i `passwordExpiresAt` (UTC; poslednja promena lozinke + `PASSWORD_MAX_AGE`, US-16: posle tog trenutka prijava nije moguća dok se lozinka ne promeni). Identitet samo iz `X-User-ID`; bez heša lozinke. |
 | `POST /api/users/me/password` | Users | da | US-14 | Promena lozinke: `{currentPassword, newPassword, newPasswordConfirm}`. Nova lozinka mora biti jaka i različita od trenutne, a trenutna lozinka stara najmanje `PASSWORD_MIN_AGE` (podrazumevano 24h). Uspeh `204`, pa se token zahteva opoziva i korisnik se ponovo prijavljuje. Greške: `400` pravila lozinke, `403` pogrešna trenutna lozinka (namerno ne `401`), `409` prerano menjanje ili istovremena promena. |
 | `GET /api/auth/session` | gateway | da | US-32 | Odgovara sam gateway posle provere tokena i opoziva: `{userId, role}`. Klijent proverava da li sačuvan token još važi (npr. posle odjave u drugom tabu). |
 | `POST /api/folders` | Files | da | US-01 | Kreiranje foldera. |

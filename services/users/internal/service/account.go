@@ -5,13 +5,15 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/model"
 	"github.com/stefanbrmbota/file-storage-platform/services/users/internal/repository"
 )
 
 // Account su podaci o nalogu za prikaz samom korisniku (US-06): profil, kvota,
-// zauzeće i preostali prostor. Namerno nema heš lozinke ni interna polja.
+// zauzeće i preostali prostor, te kada lozinka ističe (US-16). Namerno nema heš
+// lozinke ni interna polja.
 type Account struct {
 	ID             string     `json:"id"`
 	FirstName      string     `json:"firstName"`
@@ -21,6 +23,9 @@ type Account struct {
 	QuotaBytes     int64      `json:"quotaBytes"`
 	UsedBytes      int64      `json:"usedBytes"`
 	RemainingBytes int64      `json:"remainingBytes"`
+	// PasswordExpiresAt je trenutak (UTC) posle kog prijava više nije moguća dok se
+	// lozinka ne promeni: poslednja promena + PASSWORD_MAX_AGE.
+	PasswordExpiresAt time.Time `json:"passwordExpiresAt"`
 }
 
 // AccountFinder je pristup nalogu po ID-ju.
@@ -30,12 +35,18 @@ type AccountFinder interface {
 
 // AccountService vraća podatke o nalogu prijavljenog korisnika (US-06).
 type AccountService struct {
-	users AccountFinder
+	users  AccountFinder
+	maxAge time.Duration
 }
 
-// NewAccountService vraća servis za podatke o nalogu.
-func NewAccountService(users AccountFinder) *AccountService {
-	return &AccountService{users: users}
+// NewAccountService vraća servis za podatke o nalogu. maxAge je najduže vreme
+// važenja lozinke (PASSWORD_MAX_AGE, isto kao u prijavi) i mora biti pozitivan,
+// da prikazani rok uvek odgovara pravilu koje prijava stvarno primenjuje.
+func NewAccountService(users AccountFinder, maxAge time.Duration) (*AccountService, error) {
+	if maxAge <= 0 {
+		return nil, errors.New("podaci o nalogu: rok važenja lozinke mora biti pozitivan")
+	}
+	return &AccountService{users: users, maxAge: maxAge}, nil
 }
 
 // Get vraća nalog sa kvotom i preostalim prostorom (kvota - zauzeće, najmanje 0).
@@ -65,5 +76,7 @@ func (s *AccountService) Get(ctx context.Context, userID string) (Account, error
 		QuotaBytes:     u.QuotaBytes,
 		UsedBytes:      u.UsedBytes,
 		RemainingBytes: max(0, u.QuotaBytes-u.UsedBytes),
+
+		PasswordExpiresAt: u.PasswordExpiresAt(s.maxAge).UTC(),
 	}, nil
 }

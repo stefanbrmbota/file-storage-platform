@@ -61,6 +61,21 @@ func TestLoginVerifyHandler_InvalidOTP_SameResponse(t *testing.T) {
 	}
 }
 
+// Istekla lozinka (US-16) u drugom koraku: 403 sa uputom za reset, bez tokena.
+func TestLoginVerifyHandler_PasswordExpired(t *testing.T) {
+	rec := doLoginVerify(&fakeFinisher{err: service.ErrPasswordExpired}, `{"email":"pera@example.com","code":"482915"}`)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, ocekivano 403", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "lozinka je istekla") || !strings.Contains(body, "Zaboravio si lozinku?") {
+		t.Errorf("poruka mora uputiti na reset lozinke: %s", body)
+	}
+	if strings.Contains(body, `"token"`) || strings.Contains(body, "482915") {
+		t.Errorf("odgovor ne sme sadrzati token ni kod: %s", body)
+	}
+}
+
 func TestLoginVerifyHandler_BadRequest(t *testing.T) {
 	tests := map[string]string{
 		"neispravan JSON": `{nije json`,

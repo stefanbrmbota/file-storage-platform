@@ -28,27 +28,44 @@ type TokenIssuer interface {
 	Issue(userID string, role model.Role) (string, error)
 }
 
+// ErrPasswordExpired se vraća kada je lozinka starija od dozvoljenog (US-16).
+// Vraća se tek pošto je dokazano da korisnik zna lozinku (prvi korak) odnosno OTP
+// (drugi korak), pa ne otkriva ništa o nalogu onome ko te podatke nema. Prijava je
+// onemogućena dok se lozinka ne promeni resetom (US-15).
+var ErrPasswordExpired = errors.New("service: lozinka je istekla")
+
 // LoginService izvodi prijavu (US-05): prvi korak je provera lozinke i slanje
-// OTP-a, drugi provera OTP-a i izdavanje JWT-a.
+// OTP-a, drugi provera OTP-a i izdavanje JWT-a. Nalog sa isteklom lozinkom
+// (US-16) se ne može prijaviti.
 type LoginService struct {
 	users     repository.UserRepository
 	otp       OTPIssuer
 	tokens    TokenIssuer
 	mailer    mail.Mailer
 	otpTTL    time.Duration
+	maxAge    time.Duration
 	dummyHash string
+	now       func() time.Time
 }
 
-// NewLoginService vraća servis. otpTTL se koristi samo za tekst mejla. Lažni
-// heš se računa jednom, sa istim parametrima kao prave lozinke: kad nalog ne
-// postoji, lozinka se ipak proverava protiv njega, pa vreme odgovora ne
-// otkriva da li je email registrovan.
-func NewLoginService(users repository.UserRepository, otp OTPIssuer, tokens TokenIssuer, mailer mail.Mailer, otpTTL time.Duration, params password.Params) (*LoginService, error) {
+// NewLoginService vraća servis. otpTTL se koristi samo za tekst mejla. maxAge je
+// najduže vreme važenja lozinke (PASSWORD_MAX_AGE) i mora biti pozitivan: ne
+// može da se izostavi, pa se istek ne isključuje slučajno. Lažni heš se računa
+// jednom, sa istim parametrima kao prave lozinke: kad nalog ne postoji, lozinka
+// se ipak proverava protiv njega, pa vreme odgovora ne otkriva da li je email
+// registrovan.
+func NewLoginService(users repository.UserRepository, otp OTPIssuer, tokens TokenIssuer, mailer mail.Mailer, otpTTL time.Duration, params password.Params, maxAge time.Duration) (*LoginService, error) {
+	if maxAge <= 0 {
+		return nil, errors.New("prijava: rok važenja lozinke mora biti pozitivan")
+	}
 	dummy, err := password.Hash("lazna-lozinka-za-izjednacavanje-vremena", params)
 	if err != nil {
 		return nil, fmt.Errorf("prijava: lazni heš: %w", err)
 	}
-	return &LoginService{users: users, otp: otp, tokens: tokens, mailer: mailer, otpTTL: otpTTL, dummyHash: dummy}, nil
+	return &LoginService{
+		users: users, otp: otp, tokens: tokens, mailer: mailer, otpTTL: otpTTL, maxAge: maxAge, dummyHash: dummy,
+		now: func() time.Time { return time.Now().UTC() },
+	}, nil
 }
 
 // Start proverava email, lozinku i aktivnost naloga; ako je sve ispravno,
@@ -74,6 +91,11 @@ func (s *LoginService) Start(ctx context.Context, email, plainPassword string) e
 	}
 	if !found || !ok || !u.Active {
 		return ErrInvalidCredentials
+	}
+	// Tek posle tačne lozinke: pogrešna lozinka isteklog naloga i dalje daje isti
+	// odgovor kao svaka druga. OTP se ne generiše ni ne šalje.
+	if u.PasswordExpired(s.now(), s.maxAge) {
+		return ErrPasswordExpired
 	}
 
 	code, err := s.otp.Generate(ctx, u.ID)
@@ -110,6 +132,11 @@ func (s *LoginService) Finish(ctx context.Context, email, code string) (string, 
 			return "", ErrInvalidOTP
 		}
 		return "", fmt.Errorf("prijava: %w", err)
+	}
+	// Lozinka je mogla isteći između dva koraka. Provera je posle OTP-a, a ne pre:
+	// ko nema važeći OTP ne sme da sazna stanje naloga.
+	if u.PasswordExpired(s.now(), s.maxAge) {
+		return "", ErrPasswordExpired
 	}
 
 	tok, err := s.tokens.Issue(u.ID, u.Role)

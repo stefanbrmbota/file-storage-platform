@@ -57,6 +57,28 @@ func TestLoginHandler_InvalidCredentials_SameResponse(t *testing.T) {
 	}
 }
 
+// Istekla lozinka (US-16) dobija 403 sa uputom za reset, razlicit od 401 za
+// pogresne podatke, a odgovor ne sadrzi podatke o nalogu ni lozinku.
+func TestLoginHandler_PasswordExpired(t *testing.T) {
+	rec := doLogin(&fakeLogin{err: service.ErrPasswordExpired}, `{"email":"pera@example.com","password":"TajnaLozinka123!"}`)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, ocekivano 403", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, `"error"`) || !strings.Contains(body, "lozinka je istekla") || !strings.Contains(body, "Zaboravio si lozinku?") {
+		t.Errorf("poruka mora uputiti na reset lozinke: %s", body)
+	}
+	for _, leak := range []string{"TajnaLozinka123!", "pera@example.com"} {
+		if strings.Contains(body, leak) {
+			t.Errorf("odgovor sadrzi %q: %s", leak, body)
+		}
+	}
+	invalid := doLogin(&fakeLogin{err: service.ErrInvalidCredentials}, `{"email":"pera@example.com","password":"x"}`)
+	if invalid.Code == rec.Code {
+		t.Error("istekla lozinka mora imati drugaciji status od pogresnih podataka")
+	}
+}
+
 func TestLoginHandler_BadRequest(t *testing.T) {
 	tests := map[string]string{
 		"neispravan JSON": `{nije json`,
