@@ -2,12 +2,19 @@ import { TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
 import { provideRouter } from '@angular/router';
-import { Account, Profil } from './profil';
+import { DatePipe } from '@angular/common';
+import { Account, Profil, remainingText } from './profil';
 import { formatSize } from '../folderi/files-api';
 import { ConfigService } from '../../core/config.service';
 
 const GW = 'http://gw.test';
 const GIB = 1024 * 1024 * 1024;
+
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+/** Zamrznuto "sada" (Date.now) u testovima, da rok lozinke ne zavisi od stvarnog datuma. */
+const NOW = Date.UTC(2026, 10, 26, 12, 0, 0);
 
 function account(overrides: Partial<Account> = {}): Account {
   return {
@@ -19,23 +26,34 @@ function account(overrides: Partial<Account> = {}): Account {
     quotaBytes: GIB,
     usedBytes: 405264,
     remainingBytes: GIB - 405264,
+    passwordExpiresAt: new Date(NOW + 60 * DAY).toISOString(),
     ...overrides,
   };
 }
 
 describe('Profil (kvota i zauzece)', () => {
   let http: HttpTestingController;
+  let now = NOW;
 
-  beforeEach(() => {
+  function setupTestBed() {
     TestBed.configureTestingModule({
       imports: [Profil],
       providers: [provideHttpClient(), provideHttpClientTesting(), provideRouter([])],
     });
     TestBed.inject(ConfigService).setForTest({ gatewayUrl: GW });
     http = TestBed.inject(HttpTestingController);
+  }
+
+  beforeEach(() => {
+    now = NOW;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    setupTestBed();
   });
 
-  afterEach(() => http.verify());
+  afterEach(() => {
+    http.verify();
+    vi.restoreAllMocks();
+  });
 
   function render(a: Account) {
     const fixture = TestBed.createComponent(Profil);
@@ -165,5 +183,123 @@ describe('Profil (kvota i zauzece)', () => {
     http.expectOne(`${GW}/api/users/me`).error(new ProgressEvent('error'), { status: 0 });
     fixture.detectChanges();
     expect((fixture.nativeElement as HTMLElement).querySelector('[role=alert]')?.textContent).toContain('Server trenutno nije dostupan');
+  });
+
+  // ---- Rok lozinke (US-16, T-16.4) ----
+
+  /** Rok lozinke za nalog: istice za `ms` milisekundi od zamrznutog "sada". */
+  const expiresIn = (ms: number) => new Date(NOW + ms).toISOString();
+
+  const passwordBox = (el: HTMLElement) => el.querySelector<HTMLElement>('.profil__password');
+
+  const humanDate = (iso: string) => new DatePipe('en-US').transform(iso, 'dd.MM.yyyy. HH:mm');
+
+  it('prikazuje do kada lozinka vazi i koliko je jos ostalo', () => {
+    const iso = expiresIn(40 * DAY + 5 * HOUR);
+    const el = render(account({ passwordExpiresAt: iso }));
+    const box = passwordBox(el)!;
+    expect(box.textContent).toContain(`Lozinka važi do ${humanDate(iso)}`);
+    expect(box.textContent).toContain('Još 40 dana.');
+    expect(box.classList.contains('profil__password--warn')).toBe(false);
+    expect(box.classList.contains('profil__password--expired')).toBe(false);
+    expect(box.getAttribute('role')).toBeNull(); // bez upozorenja nema alarma
+  });
+
+  it('upozorava u poslednjih 7 dana (granica ukljucena)', () => {
+    const el = render(account({ passwordExpiresAt: expiresIn(7 * DAY) }));
+    const box = passwordBox(el)!;
+    expect(box.classList.contains('profil__password--warn')).toBe(true);
+    expect(box.getAttribute('role')).toBe('alert');
+    expect(box.textContent).toContain('Još 7 dana.');
+  });
+
+  it('minut preko granice od 7 dana jos nije upozorenje', () => {
+    const el = render(account({ passwordExpiresAt: expiresIn(7 * DAY + MINUTE) }));
+    expect(passwordBox(el)!.classList.contains('profil__password--warn')).toBe(false);
+  });
+
+  it('skraceni period za odbranu: preostalo u satima i minutima', () => {
+    expect(passwordBox(render(account({ passwordExpiresAt: expiresIn(3 * HOUR + 10 * MINUTE) })))!.textContent).toContain('Još 3 sata.');
+    TestBed.resetTestingModule();
+    setupTestBed();
+    expect(passwordBox(render(account({ passwordExpiresAt: expiresIn(90_000) })))!.textContent).toContain('Još 1 minut.');
+    TestBed.resetTestingModule();
+    setupTestBed();
+    const el = render(account({ passwordExpiresAt: expiresIn(20_000) }));
+    expect(passwordBox(el)!.textContent).toContain('Još manje od minut.');
+    expect(passwordBox(el)!.classList.contains('profil__password--warn')).toBe(true);
+  });
+
+  it('istekla lozinka: poruka da se promeni odmah, uz crveno upozorenje', () => {
+    const el = render(account({ passwordExpiresAt: expiresIn(-HOUR) }));
+    const box = passwordBox(el)!;
+    expect(box.classList.contains('profil__password--expired')).toBe(true);
+    expect(box.getAttribute('role')).toBe('alert');
+    expect(box.textContent).toContain('Lozinka je istekla');
+    expect(box.textContent).toContain('Zaboravio si lozinku?');
+    expect(el.querySelector('a[href="/promena-lozinke"]')).not.toBeNull(); // promena je ponudjena
+  });
+
+  it('tacno u trenutku isteka lozinka se tretira kao istekla', () => {
+    const el = render(account({ passwordExpiresAt: expiresIn(0) }));
+    expect(passwordBox(el)!.classList.contains('profil__password--expired')).toBe(true);
+  });
+
+  it('bez roka u odgovoru (stariji server) nema prikaza roka, a profil radi', () => {
+    const el = render(account({ passwordExpiresAt: undefined }));
+    expect(passwordBox(el)).toBeNull();
+    expect(el.textContent).not.toContain('Lozinka važi do');
+    expect(el.textContent).toContain('Ena Testić');
+    expect(el.querySelector('a[href="/promena-lozinke"]')).not.toBeNull();
+  });
+
+  it('neispravan rok u odgovoru se ignorise (nema NaN ni "Invalid Date")', () => {
+    const el = render(account({ passwordExpiresAt: 'nije-datum' }));
+    expect(passwordBox(el)).toBeNull();
+    expect(el.textContent).not.toContain('NaN');
+    expect(el.textContent).not.toContain('Invalid');
+  });
+
+  it('ponovno ucitavanje racuna preostalo vreme od novog "sada"', () => {
+    const fixture = TestBed.createComponent(Profil);
+    fixture.detectChanges();
+    http.expectOne(`${GW}/api/users/me`).flush({ error: 'x' }, { status: 500, statusText: 'Server Error' });
+    fixture.detectChanges();
+
+    now = NOW + 2 * DAY; // dok korisnik cita gresku, vreme prolazi
+    (fixture.nativeElement as HTMLElement).querySelector<HTMLButtonElement>('button')!.click();
+    http.expectOne(`${GW}/api/users/me`).flush(account({ passwordExpiresAt: expiresIn(10 * DAY) }));
+    fixture.detectChanges();
+    expect(passwordBox(fixture.nativeElement as HTMLElement)!.textContent).toContain('Još 8 dana.');
+  });
+});
+
+describe('remainingText (srpski oblici)', () => {
+  it('dani', () => {
+    const t = (n: number) => remainingText(n * DAY);
+    expect([t(1), t(2), t(4), t(5), t(11), t(12), t(21), t(22), t(25), t(60)]).toEqual([
+      '1 dan', '2 dana', '4 dana', '5 dana', '11 dana', '12 dana', '21 dan', '22 dana', '25 dana', '60 dana',
+    ]);
+  });
+
+  it('sati', () => {
+    const t = (n: number) => remainingText(n * HOUR);
+    expect([t(1), t(2), t(4), t(5), t(11), t(21), t(23)]).toEqual(['1 sat', '2 sata', '4 sata', '5 sati', '11 sati', '21 sat', '23 sata']);
+  });
+
+  it('minuti', () => {
+    const t = (n: number) => remainingText(n * MINUTE);
+    expect([t(1), t(2), t(5), t(21), t(59)]).toEqual(['1 minut', '2 minuta', '5 minuta', '21 minut', '59 minuta']);
+  });
+
+  it('zaokruzuje nadole na najkrupniju jedinicu', () => {
+    expect(remainingText(DAY + 23 * HOUR)).toBe('1 dan');
+    expect(remainingText(HOUR + 59 * MINUTE)).toBe('1 sat');
+    expect(remainingText(MINUTE + 59_000)).toBe('1 minut');
+  });
+
+  it('manje od minuta', () => {
+    expect(remainingText(59_999)).toBe('manje od minut');
+    expect(remainingText(1)).toBe('manje od minut');
   });
 });
