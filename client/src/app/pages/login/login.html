@@ -29,6 +29,7 @@
       <button type="submit" [disabled]="busy()">{{ busy() ? 'Šaljem…' : 'Dalje' }}</button>
     </form>
     <p class="login__info"><a routerLink="/zaboravljena-lozinka">Zaboravio si lozinku?</a></p>
+    <p class="login__info"><a routerLink="/povracaj-naloga">Povraćaj naloga bez lozinke</a></p>
     <p class="login__info">Nemaš nalog? <a routerLink="/registracija">Registruj se</a></p>
   } @else {
     <form [formGroup]="codeForm" (ngSubmit)="submitCode()" novalidate>

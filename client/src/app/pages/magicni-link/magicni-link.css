@@ -1,0 +1,36 @@
+.ml {
+  max-width: 420px;
+  margin: 32px auto;
+}
+
+.ml__info {
+  color: var(--muted);
+}
+
+.ml__ok {
+  padding: 8px 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+.ml__error {
+  padding: 8px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  color: var(--danger);
+  background: #ffebe9;
+}
+
+.ml__button,
+button {
+  display: inline-block;
+  padding: 9px 12px;
+  border: none;
+  border-radius: 6px;
+  background: var(--accent);
+  color: #fff;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}

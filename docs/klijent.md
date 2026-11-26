@@ -226,6 +226,22 @@ promenljivu. Link važi `PASSWORD_RESET_TTL` (podrazumevano 15 min) i može se
 iskoristiti samo jednom; za demonstraciju se rokovi mogu skratiti u
 `services/users/.env`.
 
+## 3.12 Povraćaj naloga magičnim linkom (US-17, T-17.5)
+
+Javne stranice (bez prijave):
+
+| Ruta | Stranica | Šta radi |
+|---|---|---|
+| `/povracaj-naloga` | `pages/povracaj-naloga/` | Unos emaila (link „Povraćaj naloga bez lozinke“ je na `/prijava`); šalje `POST /api/auth/magic-link/request`. Server uvek odgovara isto, pa stranica uvek prikazuje opštu poruku „Proverite mejl“ i ne otkriva da li nalog postoji. |
+| `/magicni-link` | `pages/magicni-link/` | Ovde vodi link iz mejla: `/magicni-link#token=...`. Stranica pročita token iz fragmenta i ukloni ga iz adrese, pa šalje `POST /api/auth/magic-link/login` (token u telu). Uspeh vraća JWT, koji se čuva kao posle obične prijave (`TokenService`), i vodi na početnu. Link je jednokratan: za nevažeći, istekao ili već iskorišćen link stranica prikazuje poruku i vezu „Zatraži novi link“. |
+
+Adresu linka određuje `MAGIC_LINK_URL_BASE` u `services/users/.env.example`
+(`http://localhost:3000/magicni-link`); mejl se vidi u MailHog-u
+(http://localhost:8025). Ako promeniš rutu `/magicni-link`, promeni i tu
+promenljivu. Link važi `MAGIC_LINK_TTL` (podrazumevano 10 min); za demonstraciju
+se rok može skratiti u `services/users/.env`. Prijava linkom radi i kad je lozinka
+istekla (US-16): to je način da se pristup povrati, a lozinka se zatim menja na profilu.
+
 ## 4. Provera pre commit-a
 
 1. `npx ng test --watch=false` prolazi.

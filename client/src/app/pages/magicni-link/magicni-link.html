@@ -1,0 +1,23 @@
+<section class="ml">
+  <h1>Prijava magičnim linkom</h1>
+
+  @switch (state()) {
+    @case ('loading') {
+      <p class="ml__info">Prijavljujem te…</p>
+    }
+    @case ('missing') {
+      <p class="ml__error" role="alert">
+        Link nije ispravan. Otvori link iz mejla u celosti ili zatraži novi.
+      </p>
+      <p><a routerLink="/povracaj-naloga">Zatraži novi link</a></p>
+    }
+    @case ('error') {
+      <p class="ml__error" role="alert">{{ error() }}</p>
+      @if (canRetry()) {
+        <p><button type="button" (click)="login()">Pokušaj ponovo</button></p>
+      } @else {
+        <p><a routerLink="/povracaj-naloga">Zatraži novi link</a> · <a routerLink="/prijava">Prijava</a></p>
+      }
+    }
+  }
+</section>
