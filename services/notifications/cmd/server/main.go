@@ -14,6 +14,8 @@ import (
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/handler"
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/repository"
 	"github.com/stefanbrmbota/file-storage-platform/services/notifications/internal/service"
+
+	"github.com/stefanbrmbota/file-storage-platform/pkg/reqlog"
 )
 
 func main() {
@@ -47,7 +49,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           mux,
+		Handler:           reqlog.RejectedInput(logger, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		WriteTimeout:      30 * time.Second,
