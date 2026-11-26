@@ -17,4 +17,5 @@ FROM nginxinc/nginx-unprivileged:1.28-alpine
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist/client/browser /usr/share/nginx/html
 COPY --chmod=755 docker/40-config-json.sh /docker-entrypoint.d/40-config-json.sh
-EXPOSE 8080
+# 8443 = HTTPS (US-67); 8080 samo za healthcheck unutar kontejnera.
+EXPOSE 8443
