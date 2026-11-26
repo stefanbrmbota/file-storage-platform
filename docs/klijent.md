@@ -163,6 +163,12 @@ Koristi zajedničke boje iz `src/styles.css` (`var(--accent)`,
 `var(--danger)`, `var(--border)`, `var(--muted)`...), da sve stranice
 izgledaju isto. Stil samo za tvoju stranicu ide u njen `.css`.
 
+**Prikaz korisničkih podataka (US-66):** nazive fajlova i foldera, imena,
+poruke i greške sa servera prikazuj samo interpolacijom `{{ }}` ili
+vezivanjem za tekst/atribut (`[attr.x]`), jer ih Angular tada enkoduje.
+Ne koristi `[innerHTML]`, `bypassSecurityTrust*` ni ručno pravljenje HTML-a
+od podataka. Primer testa: `pages/folderi/folderi-xss.spec.ts`.
+
 ### 3.7 Test
 
 U `<stranica>.spec.ts` gateway se zamenjuje lažnim (`HttpTestingController`).
