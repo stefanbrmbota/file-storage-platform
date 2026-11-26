@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	gocql "github.com/apache/cassandra-gocql-driver/v2"
@@ -65,9 +66,17 @@ func newCluster(cfg config.Cassandra, keyspace string) *gocql.ClusterConfig {
 	return c
 }
 
+// safeKeyspace je isto pravilo kao keyspacePattern u config paketu.
+var safeKeyspace = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
+
 // Migrate pravi keyspace i tabele iz design 3.2-3.4 ako ne postoje. Bezbedno
 // je pokrenuti ga vise puta (IF NOT EXISTS).
 func Migrate(ctx context.Context, s *gocql.Session, keyspace string, replicationFactor int, timeout time.Duration) error {
+	// Ime se ugradjuje u tekst DDL upita, pa se proverava i ovde, ne samo u
+	// config.Load (US-66): Migrate nikad ne izvrsi CQL sa nepoznatim imenom.
+	if !safeKeyspace.MatchString(keyspace) {
+		return fmt.Errorf("cassandra: neispravno ime keyspace-a")
+	}
 	for _, stmt := range SchemaStatements(keyspace, replicationFactor) {
 		qctx, cancel := context.WithTimeout(ctx, timeout)
 		err := s.Query(stmt).ExecContext(qctx)
