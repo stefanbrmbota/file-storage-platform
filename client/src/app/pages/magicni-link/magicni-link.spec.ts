@@ -25,9 +25,11 @@ describe('Prijava magičnim linkom', () => {
     TestBed.inject(ConfigService).setForTest({ gatewayUrl: GW });
     http = TestBed.inject(HttpTestingController);
     router = TestBed.inject(Router);
-    navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     const harness = await RouterTestingHarness.create();
     await harness.navigateByUrl(url, MagicniLink);
+    // Lazna navigacija na pocetnu se postavlja tek posle otvaranja stranice: okvir za
+    // testiranje i sam zove navigateByUrl, pa bi ga ranija zamena zaglavila.
+    navigate = vi.spyOn(router, 'navigateByUrl').mockResolvedValue(true);
     await harness.fixture.whenStable();
     harness.detectChanges();
     return harness;
@@ -110,6 +112,7 @@ describe('Prijava magičnim linkom', () => {
   it('server nedostupan (502) nudi ponovni pokusaj istim tokenom', async () => {
     const h = await open(`/magicni-link#token=${TOKEN}`);
     http.expectOne(URL).flush({ error: 'servis nije dostupan' }, { status: 502, statusText: 'Bad Gateway' });
+    h.detectChanges();
 
     const retry = root(h).querySelector<HTMLButtonElement>('button')!;
     expect(retry).not.toBeNull();
