@@ -67,5 +67,7 @@
         <dd>{{ formatSize(a.remainingBytes) }}</dd>
       </div>
     </dl>
+
+    <app-zahtev-kvote [quotaBytes]="a.quotaBytes" />
   }
 </section>

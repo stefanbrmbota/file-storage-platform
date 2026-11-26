@@ -5,6 +5,7 @@ import { RouterLink } from '@angular/router';
 import { ConfigService } from '../../core/config.service';
 import { apiErrorMessage } from '../../core/http/api-error';
 import { formatSize } from '../folderi/files-api';
+import { ZahtevKvote } from './zahtev-kvote';
 
 /** Odgovor GET /api/users/me (US-06): nalog i kvota prijavljenog korisnika. */
 export interface Account {
@@ -79,7 +80,7 @@ export function remainingText(ms: number): string {
  */
 @Component({
   selector: 'app-profil',
-  imports: [RouterLink, DatePipe],
+  imports: [RouterLink, DatePipe, ZahtevKvote],
   templateUrl: './profil.html',
   styleUrl: './profil.css',
 })

@@ -1,0 +1,49 @@
+<section class="zk">
+  <h2>Povećanje kvote</h2>
+
+  @if (loading()) {
+    <p class="zk__info">Proveravam status zahteva…</p>
+  }
+
+  @if (loadError()) {
+    <p class="zk__error" role="alert">{{ loadError() }}</p>
+    <p><button type="button" (click)="load()">Pokušaj ponovo</button></p>
+  }
+
+  @if (!loading() && !loadError()) {
+    @if (latest(); as r) {
+      <p
+        class="zk__status"
+        [class.zk__status--pending]="r.status === 'PENDING'"
+        [class.zk__status--approved]="r.status === 'APPROVED'"
+        [class.zk__status--rejected]="r.status === 'REJECTED'"
+        role="status"
+      >
+        Zahtev za <strong>{{ formatSize(r.requestedBytes) }}</strong>: <strong>{{ statusLabel(r.status) }}</strong>
+        <span class="zk__date">(podnet {{ r.createdAt | date: 'dd.MM.yyyy. HH:mm' }})</span>
+      </p>
+    }
+
+    @if (pending()) {
+      <p class="zk__info">Dok je zahtev na čekanju, novi se ne može podneti.</p>
+    } @else {
+      <form (submit)="$event.preventDefault(); submit()" novalidate>
+        <label for="zk-amount">Željena kvota</label>
+        <div class="zk__row">
+          <input id="zk-amount" type="text" inputmode="decimal" autocomplete="off" [value]="amount()" (input)="onAmount($event)" />
+          <select aria-label="Jedinica" (change)="onUnit($event)">
+            <option [value]="GB" [selected]="unit() === GB">GB</option>
+            <option [value]="MB" [selected]="unit() === MB">MB</option>
+          </select>
+          <button type="submit" [disabled]="busy()">{{ busy() ? 'Šaljem…' : 'Pošalji zahtev' }}</button>
+        </div>
+        @if (submitted() && problem()) {
+          <small class="zk__hint">{{ problem() }}</small>
+        }
+        @if (submitError()) {
+          <p class="zk__error" role="alert">{{ submitError() }}</p>
+        }
+      </form>
+    }
+  }
+</section>
