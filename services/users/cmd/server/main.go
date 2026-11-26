@@ -125,6 +125,22 @@ func main() {
 		os.Exit(1)
 	}
 
+	resetRepo, err := repository.NewPasswordResetRepository(startCtx, client.Database(cfg.MongoDB))
+	if err != nil {
+		logger.Error("password reset repository init failed", "err", err)
+		os.Exit(1)
+	}
+	passwordReset, err := service.NewPasswordResetService(userRepo, resetRepo, otpRepo, mailer, service.PasswordResetConfig{
+		BaseURL:  cfg.ResetURLBase,
+		TTL:      cfg.PasswordResetTTL,
+		Cooldown: cfg.PasswordResetCooldown,
+		Params:   params,
+	})
+	if err != nil {
+		logger.Error("neispravna konfiguracija reseta lozinke (RESET_URL_BASE, PASSWORD_RESET_*)", "err", err)
+		os.Exit(1)
+	}
+
 	// US-20: interne rute za kvotu smeju da zovu samo servisi koji znaju INTERNAL_TOKEN.
 	internalOnly, err := handler.RequireInternalToken(cfg.InternalToken)
 	if err != nil {
@@ -142,6 +158,9 @@ func main() {
 	mux.HandleFunc("GET /users/me", handler.MeHandler(accounts))
 	// US-14: promena lozinke prijavljenog korisnika; posle uspeha se opoziva token zahteva.
 	mux.HandleFunc("POST /users/me/password", handler.ChangePasswordHandler(passwords))
+	// US-15: reset zaboravljene lozinke mejlom; javne rute (gateway ih ne trazi JWT).
+	mux.HandleFunc("POST /password-reset/request", handler.PasswordResetRequestHandler(passwordReset))
+	mux.HandleFunc("POST /password-reset/confirm", handler.PasswordResetConfirmHandler(passwordReset))
 	mux.HandleFunc("POST /internal/tokens/check", handler.TokenCheckHandler(logout))
 	mux.Handle("POST /internal/users/{id}/quota/reserve", internalOnly(handler.ReserveQuotaHandler(quota)))
 	mux.Handle("POST /internal/users/{id}/quota/release", internalOnly(handler.ReleaseQuotaHandler(quota)))
