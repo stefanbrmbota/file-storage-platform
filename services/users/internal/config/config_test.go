@@ -123,6 +123,48 @@ func TestLoadPasswordMinAge(t *testing.T) {
 	})
 }
 
+func TestLoadPasswordResetSettings(t *testing.T) {
+	t.Setenv("ADMIN_EMAIL", "")
+	t.Setenv("ADMIN_PASSWORD", "")
+
+	t.Run("podrazumevano", func(t *testing.T) {
+		t.Setenv("RESET_URL_BASE", "")
+		t.Setenv("PASSWORD_RESET_TTL", "")
+		t.Setenv("PASSWORD_RESET_COOLDOWN", "")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.ResetURLBase != "http://localhost:3000/reset-lozinke" || cfg.PasswordResetTTL != 15*time.Minute || cfg.PasswordResetCooldown != time.Minute {
+			t.Errorf("neocekivano: %q %v %v", cfg.ResetURLBase, cfg.PasswordResetTTL, cfg.PasswordResetCooldown)
+		}
+	})
+	t.Run("iz env", func(t *testing.T) {
+		t.Setenv("RESET_URL_BASE", "https://app.example/reset")
+		t.Setenv("PASSWORD_RESET_TTL", "5m")
+		t.Setenv("PASSWORD_RESET_COOLDOWN", "10s")
+		cfg, err := Load()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.ResetURLBase != "https://app.example/reset" || cfg.PasswordResetTTL != 5*time.Minute || cfg.PasswordResetCooldown != 10*time.Second {
+			t.Errorf("neocekivano: %q %v %v", cfg.ResetURLBase, cfg.PasswordResetTTL, cfg.PasswordResetCooldown)
+		}
+	})
+	t.Run("neispravno trajanje", func(t *testing.T) {
+		for _, key := range []string{"PASSWORD_RESET_TTL", "PASSWORD_RESET_COOLDOWN"} {
+			for _, bad := range []string{"abc", "0s", "-1m"} {
+				t.Setenv("PASSWORD_RESET_TTL", "")
+				t.Setenv("PASSWORD_RESET_COOLDOWN", "")
+				t.Setenv(key, bad)
+				if _, err := Load(); err == nil {
+					t.Errorf("%s=%q: ocekivana greska", key, bad)
+				}
+			}
+		}
+	})
+}
+
 func TestLoadJWTSettings(t *testing.T) {
 	t.Setenv("ADMIN_EMAIL", "")
 	t.Setenv("ADMIN_PASSWORD", "")

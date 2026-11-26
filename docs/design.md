@@ -137,6 +137,26 @@ Indeksi:
 | `_id_` | `_id` | podrazumevani | Pronalaženje OTP-a za korisnika |
 | `ttl_expiresAt` | `{ expiresAt: 1 }` | `expireAfterSeconds: 0` | Automatsko brisanje isteklih kodova |
 
+#### Kolekcija `password_reset_tokens`
+
+Model: `services/users/internal/model/password_reset_token.go`. Jednokratni token
+iz linka za reset zaboravljene lozinke (US-15).
+
+| Polje (BSON) | Go tip | BSON tip | Obavezno | Ka klijentu | Opis |
+|---|---|---|---|---|---|
+| `_id` | `string` | string | da | ne | `users._id`. Pošto je to ključ, korisnik ima najviše jedan aktivan token; novi zahtev zamenjuje stari (jedan `ReplaceOne` sa `upsert`). |
+| `tokenHash` | `string` | string | da | ne | SHA-256 heš tokena (heks). Sam token se ne čuva, pa procurela baza ne daje upotrebljive linkove. |
+| `createdAt` | `time.Time` | date (UTC) | da | ne | Kada je token izdat; služi za ograničenje učestalosti slanja (`PASSWORD_RESET_COOLDOWN`). |
+| `expiresAt` | `time.Time` | date (UTC) | da | ne | Kraj važenja (`PASSWORD_RESET_TTL`, podrazumevano 15 min). |
+
+Indeksi:
+
+| Ime | Ključ | Opcije | Svrha |
+|---|---|---|---|
+| `_id_` | `_id` | podrazumevani | Jedan token po korisniku; provera ograničenja učestalosti |
+| `uniq_tokenHash` | `{ tokenHash: 1 }` | `unique` | Potrošnja tokena po hešu jednim `FindOneAndDelete`, pa je token atomično jednokratan |
+| `ttl_expiresAt` | `{ expiresAt: 1 }` | `expireAfterSeconds: 0` | MongoDB sam briše istekle tokene |
+
 > **Napomena o TTL-u:** MongoDB briše istekle dokumente u pozadini otprilike
 > jednom u minuti, pa istekao token ili OTP može kratko ostati u bazi. Servis
 > zato uvek sam proverava `expiresAt`; TTL indeks služi samo za čišćenje.
@@ -204,6 +224,7 @@ Indeksi:
 | `files` → MinIO objekat | 1 : 1 | `files.objectKey` | Metapodatak bez objekta ili objekat bez metapodatka je greška; redosled upisa i kompenzacija su deo sage. |
 | `users` → `confirmation_tokens` | 1 : N (u praksi 1) | `confirmation_tokens.userId` | Token se briše u istom koraku u kom se čita (`FindOneAndDelete`); neiskorišćeni ističu kroz TTL. |
 | `users` → `otps` | 1 : 0..1 | `otps._id` | Novi OTP prepisuje stari. |
+| `users` → `password_reset_tokens` | 1 : 0..1 | `password_reset_tokens._id` | Novi zahtev za reset prepisuje stari; token se troši i briše u istom koraku. |
 
 Pošto su `users` i `files`/`folders` u različitim bazama i servisima, **nema
 stranih ključeva ni transakcija preko granice servisa**. Konzistentnost se
@@ -729,7 +750,7 @@ duži od bilo kog realnog ponavljanja isporuke.
 
 | Servis | Baza | Keyspace / baza | Tabele / kolekcije |
 |---|---|---|---|
-| Users | MongoDB | `users` | `users`, `confirmation_tokens`, `otps` |
+| Users | MongoDB | `users` | `users`, `confirmation_tokens`, `otps`, `password_reset_tokens`, `revoked_tokens` |
 | Files | MongoDB + MinIO | `files` | `folders`, `files` + bucket sa sadržajem |
 | Sharing | Neo4j | — | `:User`, `:Resource:Folder`, `:Resource:File`, `CONTAINS`, `HAS_ACCESS` |
 | Notifications | Cassandra | `notifications` | `notifications_by_user`, `unread_by_user`, `processed_events` |
@@ -811,6 +832,8 @@ Rute `/api/auth/...` se mapiraju na Users rute bez `auth` dela
 | `POST /api/auth/confirm` | Users | ne | US-04 | Potvrda registracije tokenom iz linka (token u telu zahteva, ne u URL-u). |
 | `POST /api/auth/login` | Users | ne | US-05 | Prvi korak prijave: email + lozinka; šalje OTP mejlom. |
 | `POST /api/auth/login/verify` | Users | ne | US-05 | Drugi korak: OTP; vraća JWT. |
+| `POST /api/auth/password-reset/request` | Users | ne | US-15 | Zahtev za reset zaboravljene lozinke: `{email}`. Za svaki ispravan zahtev isti odgovor `202` (ne otkriva da li nalog postoji); za aktivan nalog šalje mejl sa linkom (`#token=...`, važi `PASSWORD_RESET_TTL`, podrazumevano 15 min; najviše jedan mejl po `PASSWORD_RESET_COOLDOWN`). |
+| `POST /api/auth/password-reset/confirm` | Users | ne | US-15 | Nova lozinka linkom iz mejla: `{token, newPassword, newPasswordConfirm}` (token u telu). `204`; `400` nova lozinka nije prihvatljiva ili je link nevažeći, istekao ili iskorišćen; `409` istovremena promena. Ne traži minimalnu starost lozinke. |
 | `POST /api/auth/logout` | Users | da | US-30 | Odjava: Users opoziva token (po `jti`); posle toga gateway za taj token vraća `401`. |
 | `GET /api/users/me` | Users | da | US-06 | Podaci o nalogu prijavljenog korisnika: ime, email, uloga, `quotaBytes`, `usedBytes` i `remainingBytes` (= kvota − zauzeće, najmanje 0). Identitet samo iz `X-User-ID`; bez heša lozinke. |
 | `POST /api/users/me/password` | Users | da | US-14 | Promena lozinke: `{currentPassword, newPassword, newPasswordConfirm}`. Nova lozinka mora biti jaka i različita od trenutne, a trenutna lozinka stara najmanje `PASSWORD_MIN_AGE` (podrazumevano 24h). Uspeh `204`, pa se token zahteva opoziva i korisnik se ponovo prijavljuje. Greške: `400` pravila lozinke, `403` pogrešna trenutna lozinka (namerno ne `401`), `409` prerano menjanje ili istovremena promena. |

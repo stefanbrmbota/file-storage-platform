@@ -58,11 +58,14 @@ const (
 // Nova spoljna ruta se dodaje ovde i u design 5.2. Rute /internal/... se
 // nikad ne dodaju.
 var All = []Route{
-	// Users: autentifikacija. Jedine javne rute.
+	// Users: autentifikacija. Jedine javne rute (zajedno sa resetom lozinke ispod).
 	{"POST /api/auth/register", Users, Public},
 	{"POST /api/auth/confirm", Users, Public},
 	{"POST /api/auth/login", Users, Public},
 	{"POST /api/auth/login/verify", Users, Public},
+	// Reset zaboravljene lozinke mejlom (US-15): korisnik nije prijavljen, pa su rute javne.
+	{"POST /api/auth/password-reset/request", Users, Public},
+	{"POST /api/auth/password-reset/confirm", Users, Public},
 	// Odjava: token mora biti ispravan; Users ga opoziva (US-30, T-30.5).
 	{"POST /api/auth/logout", Users, User},
 	// Users: nalog i admin (ADMIN uloga se proverava i u servisu).
