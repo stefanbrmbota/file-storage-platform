@@ -61,7 +61,7 @@ func SubmitQuotaRequestHandler(s QuotaRequestSubmitter) http.HandlerFunc {
 		created, err := s.Submit(ctx, userID, req.RequestedBytes)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.Header().Set("Cache-Control", "no-store")
 			w.WriteHeader(http.StatusCreated)
 			_ = json.NewEncoder(w).Encode(created)
@@ -99,7 +99,7 @@ func LatestQuotaRequestHandler(s QuotaRequestReader) http.HandlerFunc {
 		req, err := s.Latest(ctx, userID)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			w.Header().Set("Cache-Control", "no-store")
 			_ = json.NewEncoder(w).Encode(req)
 		case errors.Is(err, service.ErrNoQuotaRequest), errors.Is(err, service.ErrUserNotFound):

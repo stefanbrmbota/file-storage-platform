@@ -101,7 +101,7 @@ func (s *PasswordResetService) sendChangedMail(parent context.Context, u model.U
 	defer cancel()
 
 	subject := "Lozinka je promenjena"
-	body := fmt.Sprintf("Zdravo %s,\n\nlozinka vašeg naloga je upravo resetovana.\nAko to niste bili vi, odmah se obratite administratoru sistema.\n", u.FirstName)
+	body := fmt.Sprintf("Zdravo %s,\n\nlozinka vašeg naloga je upravo resetovana.\nAko to niste bili vi, odmah se obratite administratoru sistema.\n", mailName(u.FirstName))
 	if err := s.mailer.Send(ctx, u.Email, subject, body); err != nil {
 		slog.Error("reset lozinke: slanje obavestenja nije uspelo", "userId", u.ID, "err", err)
 	}

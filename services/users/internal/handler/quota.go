@@ -56,7 +56,7 @@ func ReleaseQuotaHandler(q QuotaReleaser) http.HandlerFunc {
 		used, err := q.ReleaseQuota(ctx, r.PathValue("id"), req.Bytes)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(releaseQuotaResponse{Released: req.Bytes, UsedBytes: used})
 		case errors.Is(err, service.ErrInvalidQuotaRequest):
 			writeError(w, http.StatusBadRequest, "neispravan zahtev: bytes mora biti pozitivan broj")
@@ -95,7 +95,7 @@ func ReserveQuotaHandler(q QuotaReserver) http.HandlerFunc {
 		remaining, err := q.ReserveQuota(ctx, r.PathValue("id"), req.Bytes)
 		switch {
 		case err == nil:
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(reserveQuotaResponse{Reserved: req.Bytes, RemainingBytes: remaining})
 		case errors.Is(err, service.ErrInvalidQuotaRequest):
 			writeError(w, http.StatusBadRequest, "neispravan zahtev: bytes mora biti pozitivan broj")

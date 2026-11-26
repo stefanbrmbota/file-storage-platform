@@ -88,7 +88,7 @@ func adminResult(w http.ResponseWriter, err error, logMsg string) bool {
 }
 
 func writeAdminJSON(w http.ResponseWriter, body any) {
-	w.Header().Set("Content-Type", "application/json")
+	setJSONHeaders(w)
 	w.Header().Set("Cache-Control", "no-store") // lični podaci
 	_ = json.NewEncoder(w).Encode(body)
 }

@@ -57,7 +57,7 @@ func RegisterHandler(reg Registrar) http.HandlerFunc {
 			writeError(w, http.StatusInternalServerError, "interna greška")
 			return
 		}
-		w.Header().Set("Content-Type", "application/json")
+		setJSONHeaders(w)
 		w.WriteHeader(http.StatusCreated)
 		_ = json.NewEncoder(w).Encode(u)
 	}

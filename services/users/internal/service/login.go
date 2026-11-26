@@ -105,7 +105,7 @@ func (s *LoginService) Start(ctx context.Context, email, plainPassword string) e
 
 	subject := "Kod za prijavu"
 	body := fmt.Sprintf("Zdravo %s,\n\nvaš kod za prijavu je: %s\n\nKod važi %d min i može se iskoristiti samo jednom.\nAko se niste prijavljivali, ignorišite ovaj mejl i razmislite o promeni lozinke.\n",
-		u.FirstName, code, int(s.otpTTL.Minutes()))
+		mailName(u.FirstName), code, int(s.otpTTL.Minutes()))
 	if err := s.mailer.Send(ctx, u.Email, subject, body); err != nil {
 		return fmt.Errorf("prijava: slanje mejla: %w", err)
 	}

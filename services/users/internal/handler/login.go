@@ -54,7 +54,7 @@ func LoginHandler(l LoginStarter) http.HandlerFunc {
 		switch {
 		case err == nil:
 			logLoginAttempt(r, stepLogin, req.Email, outcomeSuccess)
-			w.Header().Set("Content-Type", "application/json")
+			setJSONHeaders(w)
 			_ = json.NewEncoder(w).Encode(map[string]string{"message": "kod za prijavu je poslat na vaš mejl"})
 		case errors.Is(err, service.ErrInvalidCredentials):
 			logLoginAttempt(r, stepLogin, req.Email, outcomeFailure)

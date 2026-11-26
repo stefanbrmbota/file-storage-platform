@@ -120,7 +120,7 @@ func (s *MagicLinkService) sendLinkMail(parent context.Context, u model.User, li
 
 	subject := "Povraćaj naloga"
 	body := fmt.Sprintf("Zdravo %s,\n\nprimili smo zahtev za povraćaj naloga. Za prijavu bez lozinke otvorite sledeći link:\n\n%s\n\nLink važi do %s i može se iskoristiti samo jednom.\nAko niste tražili prijavu, ignorišite ovaj mejl: niko ne može da uđe u vaš nalog bez ovog linka.\n",
-		u.FirstName, link, expires.Format("02.01.2006. 15:04 MST"))
+		mailName(u.FirstName), link, expires.Format("02.01.2006. 15:04 MST"))
 	if err := s.mailer.Send(ctx, u.Email, subject, body); err != nil {
 		slog.Error("magicni link: slanje mejla nije uspelo", "userId", u.ID, "err", err)
 		if derr := s.tokens.Delete(ctx, u.ID); derr != nil {
