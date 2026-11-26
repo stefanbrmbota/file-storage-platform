@@ -81,6 +81,9 @@ var All = []Route{
 	{"GET /api/admin/users", Users, Admin},
 	// Admin pregled zahteva za kvotu (US-22).
 	{"GET /api/admin/quota-requests", Users, Admin},
+	// Odobravanje i odbijanje zahteva za kvotu (US-23).
+	{"POST /api/admin/quota-requests/{id}/approve", Users, Admin},
+	{"POST /api/admin/quota-requests/{id}/reject", Users, Admin},
 
 	// Files: folderi, datoteke, pretraga.
 	{"POST /api/folders", Files, User},
