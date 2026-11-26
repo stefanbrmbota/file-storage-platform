@@ -40,6 +40,9 @@ func (s *FileService) UploadNewVersion(ctx context.Context, in NewVersionInput) 
 		return nil, ErrInvalidSize
 	}
 
+	if err := validateID(in.FileID); err != nil {
+		return nil, err
+	}
 	file, err := s.files.FindByID(ctx, in.FileID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrFileNotFound

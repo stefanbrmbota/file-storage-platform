@@ -39,10 +39,14 @@ func quotaDecisionHandler(decide func(ctx context.Context, adminID, requestID st
 		if !ok {
 			return
 		}
+		requestID, ok := pathID(w, r)
+		if !ok {
+			return
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), adminTimeout)
 		defer cancel()
 
-		req, err := decide(ctx, adminID, r.PathValue("id"))
+		req, err := decide(ctx, adminID, requestID)
 		switch {
 		case err == nil:
 			w.Header().Set("Content-Type", "application/json")

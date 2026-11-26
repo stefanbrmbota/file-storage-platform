@@ -114,6 +114,7 @@ func TestListBadInput(t *testing.T) {
 		"/notifications?limit=abc",
 		"/notifications?limit=0",
 		"/notifications?limit=-3",
+		"/notifications?limit=101",
 		"/notifications?cursor=" + strings.Repeat("a", maxCursorLen+1),
 	} {
 		rec := do(ListNotifications(&fakeLister{}), target, "u1")

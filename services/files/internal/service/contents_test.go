@@ -17,8 +17,8 @@ func TestContentsOfRoot(t *testing.T) {
 		}
 	}
 	svc.files.(*fakeFileStore).files = []model.File{
-		{ID: "f1", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID},
-		{ID: "f2", Name: "tudji.txt", OwnerID: "marko", ParentID: root.ID},
+		{ID: "11111111-1111-4111-8111-111111111111", Name: "cv.pdf", OwnerID: "ana", ParentID: root.ID},
+		{ID: "22222222-2222-4222-8222-222222222222", Name: "tudji.txt", OwnerID: "marko", ParentID: root.ID},
 	}
 
 	for _, id := range []string{"", RootFolderID, root.ID} {
@@ -92,7 +92,7 @@ func TestContentsNotFound(t *testing.T) {
 		owner    string
 		folderID string
 	}{
-		{"unknown folder", "ana", "does-not-exist"},
+		{"unknown folder", "ana", "00000000-0000-4000-8000-000000000000"},
 		{"someone else's folder", "ana", marko.ID},
 		{"user without root", "petar", RootFolderID},
 	}

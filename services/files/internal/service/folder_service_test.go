@@ -199,7 +199,9 @@ func TestCreateErrors(t *testing.T) {
 		{"control char", "ana", "a\nb", "", ErrInvalidName},
 		{"name too long", "ana", strings.Repeat("x", 256), "", ErrInvalidName},
 		{"duplicate in same parent", "ana", "Fakultet", root.ID, ErrNameTaken},
-		{"unknown parent", "ana", "x", "does-not-exist", ErrParentNotFound},
+		{"unknown parent", "ana", "x", "00000000-0000-4000-8000-000000000000", ErrParentNotFound},
+		{"invalid parent id", "ana", "x", "does-not-exist", ErrInvalidID},
+		{"forbidden character", "ana", "a<b>", "", ErrInvalidName},
 		{"someone else's parent", "ana", "x", markoRoot.ID, ErrParentNotFound},
 		{"user without root", "petar", "x", "", ErrParentNotFound},
 	}

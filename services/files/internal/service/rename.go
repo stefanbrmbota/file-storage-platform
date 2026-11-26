@@ -23,6 +23,9 @@ func (s *FolderService) RenameFolder(ctx context.Context, ownerID, folderID, nam
 		return nil, err
 	}
 
+	if err := validateID(folderID); err != nil {
+		return nil, err
+	}
 	folder, err := s.store.FindByID(ctx, folderID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrFolderNotFound
@@ -56,6 +59,9 @@ func (s *FolderService) RenameFile(ctx context.Context, ownerID, fileID, name st
 		return nil, err
 	}
 
+	if err := validateID(fileID); err != nil {
+		return nil, err
+	}
 	file, err := s.files.FindByID(ctx, fileID)
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, ErrFileNotFound

@@ -74,7 +74,8 @@ func TestNewVersionRejected(t *testing.T) {
 		want   error
 	}{
 		{"not the owner", func(_ *uploadEnv, in *NewVersionInput) { in.OwnerID = "marko" }, ErrFileNotFound},
-		{"unknown file", func(_ *uploadEnv, in *NewVersionInput) { in.FileID = "nope" }, ErrFileNotFound},
+		{"unknown file", func(_ *uploadEnv, in *NewVersionInput) { in.FileID = "00000000-0000-4000-8000-000000000000" }, ErrFileNotFound},
+		{"invalid file id", func(_ *uploadEnv, in *NewVersionInput) { in.FileID = "nope" }, ErrInvalidID},
 		{"negative size", func(_ *uploadEnv, in *NewVersionInput) { in.Size = -1 }, ErrInvalidSize},
 		{"quota exceeded", func(_ *uploadEnv, in *NewVersionInput) {
 			big := strings.Repeat("x", 200)
